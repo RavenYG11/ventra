@@ -97,11 +97,13 @@ async function inisialisasi(): Promise<DbVentra> {
   }
   try {
     pool = await sqlite3.installOpfsSAHPoolVfs();
-  } catch {
+  } catch (e) {
+    // JANGAN telan error asli — tampilkan agar bisa didiagnosis.
+    const sebab = e instanceof Error ? e.message : String(e);
     throw new Error(
-      'Gagal membuka database lokal. Kemungkinan database sedang dibuka di tab ' +
-        'lain, atau mode private/incognito memblokir penyimpanan. Tutup tab Ventra ' +
-        'lain lalu muat ulang halaman ini.'
+      'Gagal membuka database lokal (' + sebab + '). Kemungkinan database sedang ' +
+        'dibuka di tab lain, atau mode private/incognito memblokir penyimpanan. ' +
+        'Tutup tab Ventra lain lalu muat ulang halaman ini.'
     );
   }
 
