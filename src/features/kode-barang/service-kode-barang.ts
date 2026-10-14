@@ -17,6 +17,7 @@ import {
   infoMapping,
   lepasMapping,
   nonaktifkanKodeBarang,
+  petaKategoriPerKode,
   petaKodePerKategori,
   pratinjauKodeBerikutnya,
   tambahKodeBarang,
@@ -130,6 +131,11 @@ export async function aktifkanKodeBarang(id: number): Promise<Hasil<void>> {
 
 export async function muatInfoMapping(kategoriId: number): Promise<InfoMapping> {
   return infoMapping(kategoriId);
+}
+
+/** Peta kode -> nama kategori pemakai — untuk label "juga dipakai" tab Mapping. */
+export async function muatPetaKategoriPerKode(): Promise<Record<number, string[]>> {
+  return petaKategoriPerKode();
 }
 
 export async function hubungkanKode(

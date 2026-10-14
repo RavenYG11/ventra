@@ -14,6 +14,7 @@ import {
   hubungkanKode,
   lepasKode,
   muatInfoMapping,
+  muatPetaKategoriPerKode,
   type InfoMapping,
 } from '../../features/kode-barang/service-kode-barang';
 import { StatusAktif } from './komponen';
@@ -22,7 +23,16 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
   const [kategori, setKategori] = useState<KategoriRingkasan[]>([]);
   const [kategoriId, setKategoriId] = useState(0);
   const [info, setInfo] = useState<InfoMapping | null>(null);
+  const [petaKat, setPetaKat] = useState<Record<number, string[]>>({});
   const [galat, setGalat] = useState<string | null>(null);
+
+  async function muatPeta() {
+    try {
+      setPetaKat(await muatPetaKategoriPerKode());
+    } catch {
+      /* peta hanya untuk label — kegagalan tidak memblokir daftar */
+    }
+  }
 
   useEffect(() => {
     daftarKategoriDenganRingkasan().then((d) => {
@@ -30,6 +40,7 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
       setKategori(aktif);
       if (aktif.length > 0) setKategoriId(aktif[0].id);
     });
+    muatPeta();
   }, []);
 
   useEffect(() => {
@@ -41,6 +52,7 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
     await hubungkanKode(kategoriId, kodeBarangId);
     tampilToast(`TERHUBUNG: ${kode}`);
     setInfo(await muatInfoMapping(kategoriId));
+    await muatPeta();
   }
 
   async function lepas(kodeBarangId: number, kode: string) {
@@ -52,6 +64,7 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
     }
     tampilToast(`DILEPAS: ${kode}`);
     setInfo(await muatInfoMapping(kategoriId));
+    await muatPeta();
   }
 
   const namaKat = kategori.find((k) => k.id === kategoriId)?.nama ?? '';
@@ -126,34 +139,30 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
           <div className="tabel-wrap">
             <table className="grid">
               <tbody>
-                {tersedia.map((k) => {
-                  // Label "juga dipakai: ..." — kode yang sudah dipakai kategori lain
-                  // (counter shared, M:N). Sesuai mockup (QA BUG-7).
-                  const dipakaiLain = info?.pemakaiLain[k.id] ?? [];
-                  return (
-                    <tr key={k.id}>
-                      <td>
-                        <span className="kode-mono">{k.kode}</span>
-                        <div className="hint">
-                          {k.nama}
-                          {dipakaiLain.length > 0 && (
-                            <>
-                              {' '}·{' '}
-                              <b className="teks-amber">
-                                juga dipakai: {dipakaiLain.join(', ')}
-                              </b>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="nowrap" style={{ textAlign: 'right' }}>
-                        <Tombol varian="outline" onClick={() => hubungkan(k.id, k.kode)}>
-                          Hubungkan
-                        </Tombol>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {tersedia.map((k) => (
+                  <tr key={k.id}>
+                    <td>
+                      <span className="kode-mono">{k.kode}</span>
+                      <div className="hint">{k.nama}</div>
+                      {/* QA BUG-7: label mockup "juga dipakai: ..." bila kode
+                          dipakai kategori lain (counter shared, M:N). */}
+                      {(() => {
+                        const lain = (petaKat[k.id] ?? []).filter((n) => n !== namaKat);
+                        return lain.length > 0 ? (
+                          <div className="hint">
+                            juga dipakai:{' '}
+                            <b style={{ color: 'var(--amber)' }}>{lain.join(', ')}</b>
+                          </div>
+                        ) : null;
+                      })()}
+                    </td>
+                    <td className="nowrap" style={{ textAlign: 'right' }}>
+                      <Tombol varian="outline" onClick={() => hubungkan(k.id, k.kode)}>
+                        Hubungkan
+                      </Tombol>
+                    </td>
+                  </tr>
+                ))}
                 {tersedia.length === 0 && (
                   <tr>
                     <td className="kosong">Tidak ada kode tersedia.</td>
