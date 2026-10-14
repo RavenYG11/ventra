@@ -162,3 +162,43 @@ td.nowrap { white-space: nowrap; }
 @keyframes toast-masuk { from { opacity: 0; transform: translate(-50%, 12px); } }
 
 .kosong { text-align: center; color: var(--muted); padding: 40px 0; }
+
+/* ---------- Product Management (assignment #26) ---------- */
+/* Sub-tab: Kategori / Kode Barang / Mapping (amber = aktif, mockup Prapto). */
+.subtabs { display: flex; gap: 10px; margin-bottom: 16px; }
+.subtab {
+  padding: 10px 24px; border: 2px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--ink);
+  font-size: 14px; font-weight: 800; letter-spacing: .5px; cursor: pointer;
+  text-transform: uppercase;
+}
+.subtab.aktif { background: var(--amber); color: #000; border-color: var(--amber); }
+
+/* Kotak state — galeri mockup Product Management. */
+.warnbox {
+  background: #231a05; border: 2px solid var(--amber); color: #ffd98a;
+  border-radius: 6px; padding: 14px 16px; margin: 12px 0; font-size: 14px;
+}
+.infobox {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 16px; margin: 12px 0; color: var(--muted); font-size: 13px;
+}
+.previewbox {
+  border: 2px solid var(--blue); border-radius: 6px; padding: 14px 16px;
+  margin: 12px 0; background: #0a1420;
+}
+.previewbox .plabel {
+  font-size: 11px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .6px; margin-bottom: 4px;
+}
+.previewbox .pcode {
+  font-family: Consolas, monospace; font-size: 20px; color: var(--blue); font-weight: 700;
+}
+.chip {
+  display: inline-block; background: var(--panel2); border: 1px solid var(--line);
+  color: var(--blue); font-family: Consolas, monospace; font-size: 12px;
+  border-radius: 4px; padding: 2px 8px; margin: 1px 2px;
+}
+.link-kecil { color: var(--amber); cursor: pointer; text-decoration: underline; font-size: 13px; }
+.status-aktif { color: var(--green); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+.status-nonaktif { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }

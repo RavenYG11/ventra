@@ -1,14 +1,17 @@
 // Ventra — root aplikasi.
-// v0.1: login → daftar barang. Dashboard & transaksi menyusul di v0.2.
+// Menu: Barang, Transaksi (v0.2), Product Management (kategori + kode barang + mapping).
 import { useEffect, useState } from 'react';
 import LoginPage from './pages/LoginPage';
 import BarangPage from './pages/BarangPage';
+import ProductManagementPage from './pages/ProductManagementPage';
 import { keluar, sesiAktif } from './features/pengguna/service-login';
+
+type TabAktif = 'barang' | 'pm';
 
 export default function App() {
   const [pengguna, setPengguna] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [tab, setTab] = useState<'barang'>('barang');
+  const [tab, setTab] = useState<TabAktif>('barang');
 
   useEffect(() => {
     setPengguna(sesiAktif());
@@ -36,11 +39,14 @@ export default function App() {
           VENTRA<small>STOCK BARANG</small>
         </div>
         <nav className="tabs">
-          <button className={'tab aktif'} onClick={() => setTab('barang')}>
+          <button className={tab === 'barang' ? 'tab aktif' : 'tab'} onClick={() => setTab('barang')}>
             Barang
           </button>
           <button className="tab" disabled title="Segera hadir di v0.2">
             Transaksi
+          </button>
+          <button className={tab === 'pm' ? 'tab aktif' : 'tab'} onClick={() => setTab('pm')}>
+            Product Management
           </button>
         </nav>
         <div>
@@ -51,7 +57,14 @@ export default function App() {
         </div>
       </header>
 
-      {tab === 'barang' && <BarangPage namaPengguna={pengguna} tampilToast={setToast} />}
+      {tab === 'barang' && (
+        <BarangPage
+          namaPengguna={pengguna}
+          tampilToast={setToast}
+          onKeProductManagement={() => setTab('pm')}
+        />
+      )}
+      {tab === 'pm' && <ProductManagementPage tampilToast={setToast} />}
 
       {toast && <div className="toast">{toast}</div>}
     </>

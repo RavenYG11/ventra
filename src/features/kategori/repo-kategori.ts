@@ -1,4 +1,7 @@
 // Repo kategori — hanya SQL, tanpa logika bisnis.
+// Aturan: UI tidak boleh import file ini langsung — selalu lewat service-kategori.ts.
+// Sejak migrasi 003_kode_barang: kolom prefix_kode & nomor_urut_terakhir PINDAH
+// ke tabel kode_barang. Kategori kini hanya menyimpan nama (+ status aktif).
 import { dapatkanDb } from '../../lib/db';
 import type { Kategori } from '../../types';
 
@@ -8,22 +11,37 @@ export async function daftarKategori(termasukNonaktif = false): Promise<Kategori
   return db.select<Kategori[]>(`SELECT * FROM kategori ${klausa} ORDER BY nama`);
 }
 
-export async function tambahKategori(nama: string, prefixKode: string): Promise<number> {
+export interface KategoriRingkasan extends Kategori {
+  /** Jumlah kode barang AKTIF yang terhubung (via mapping). */
+  jml_kode: number;
+  /** Jumlah barang AKTIF di kategori ini. */
+  jml_barang: number;
+}
+
+/** Daftar kategori + ringkasan untuk tab Kategori (Product Management). */
+export async function daftarKategoriRingkasan(): Promise<KategoriRingkasan[]> {
   const db = await dapatkanDb();
-  const hasil = await db.execute('INSERT INTO kategori (nama, prefix_kode) VALUES ($1, $2)', [
-    nama.trim(),
-    prefixKode.trim().toUpperCase(),
-  ]);
+  return db.select<KategoriRingkasan[]>(
+    `SELECT k.*,
+       (SELECT COUNT(*) FROM kategori_kode_barang m
+         JOIN kode_barang kb ON kb.id = m.kode_barang_id
+        WHERE m.kategori_id = k.id AND kb.aktif = 1) AS jml_kode,
+       (SELECT COUNT(*) FROM barang b
+        WHERE b.kategori_id = k.id AND b.aktif = 1) AS jml_barang
+     FROM kategori k
+     ORDER BY k.nama`
+  );
+}
+
+export async function tambahKategori(nama: string): Promise<number> {
+  const db = await dapatkanDb();
+  const hasil = await db.execute('INSERT INTO kategori (nama) VALUES ($1)', [nama.trim()]);
   return Number(hasil.lastInsertId);
 }
 
-export async function ubahKategori(id: number, nama: string, prefixKode: string): Promise<void> {
+export async function ubahKategori(id: number, nama: string): Promise<void> {
   const db = await dapatkanDb();
-  await db.execute('UPDATE kategori SET nama = $1, prefix_kode = $2 WHERE id = $3', [
-    nama.trim(),
-    prefixKode.trim().toUpperCase(),
-    id,
-  ]);
+  await db.execute('UPDATE kategori SET nama = $1 WHERE id = $2', [nama.trim(), id]);
 }
 
 export async function nonaktifkanKategori(id: number): Promise<void> {

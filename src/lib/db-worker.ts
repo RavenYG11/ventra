@@ -89,6 +89,7 @@ let urlWasm = '';
 /** Isi mentah file migrasi SQL (pola ?raw = teks mentah Vite). */
 let teksMigrasi001 = '';
 let teksMigrasi002 = '';
+let teksMigrasi003 = '';
 
 // ---------------------------------------------------------------------------
 // Diagnostik: tangkap error runtime yang lolos dari handler pesan.
@@ -212,11 +213,14 @@ async function initDb(): Promise<void> {
     const m3 = await import('../../migrasi/001_awal.sql?raw');
     modulGagal = 'migrasi/002_audit_keamanan.sql';
     const m4 = await import('../../migrasi/002_audit_keamanan.sql?raw');
+    modulGagal = 'migrasi/003_kode_barang.sql';
+    const m5 = await import('../../migrasi/003_kode_barang.sql?raw');
     // Ambil default export tiap modul (pola Vite: ?url/?raw → string).
     muatSqlite3 = m1.default as unknown as MuatSqlite3;
     urlWasm = m2.default;
     teksMigrasi001 = m3.default;
     teksMigrasi002 = m4.default;
+    teksMigrasi003 = m5.default;
   } catch (e) {
     const sebab = e instanceof Error ? e.message : String(e);
     const rincian = 'import "' + modulGagal + '" gagal: ' + sebab;
@@ -314,6 +318,7 @@ function jalankanMigrasi(database: DbWasm): void {
   const daftarMigrasi: Array<[versi: string, sql: string]> = [
     ['001_awal', teksMigrasi001],
     ['002_audit_keamanan', teksMigrasi002],
+    ['003_kode_barang', teksMigrasi003],
   ];
   database.exec(
     `CREATE TABLE IF NOT EXISTS migrasi (

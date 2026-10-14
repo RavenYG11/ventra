@@ -1,6 +1,9 @@
 // Service barang — validasi + aturan bisnis master barang.
+// Sejak migrasi 003_kode_barang: tambah barang wajib memilih KODE BARANG
+// (aktif & ter-mapping ke kategori yang dipilih) — counter menempel di kode.
 import type { Barang, Hasil } from '../../types';
 import { daftarKategori } from '../kategori/repo-kategori';
+import { daftarKodeAktifUntukKategori } from '../kode-barang/repo-kode-barang';
 import {
   ambilBarang,
   daftarBarang,
@@ -49,6 +52,13 @@ export async function tambahBarangBaru(
   if (v) return { ok: false, galat: v };
   const kategori = (await daftarKategori(false)).find((k) => k.id === input.kategori_id);
   if (!kategori) return { ok: false, galat: 'Pilih kategori yang valid.' };
+  // Kode barang harus aktif DAN ter-mapping ke kategori ini (cek ganda di SQL CTE).
+  const kodeValid = (await daftarKodeAktifUntukKategori(input.kategori_id)).some(
+    (kb) => kb.id === input.kode_barang_id
+  );
+  if (!kodeValid) {
+    return { ok: false, galat: 'Pilih kode barang yang valid untuk kategori ini.' };
+  }
   try {
     const kode = await tambahBarangAtomik(input, dibuatOleh);
     return { ok: true, data: kode };

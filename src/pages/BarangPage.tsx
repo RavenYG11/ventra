@@ -1,9 +1,19 @@
-// Layar daftar barang Ventra (v0.1): daftar + cari + tambah/ubah/nonaktifkan + kelola kategori.
-// Kode barang auto-generate (prefix kategori + 7 digit) — tidak diketik manual.
+// Layar daftar barang Ventra: daftar + cari + tambah/ubah/nonaktifkan.
+// Kode barang auto-generate (kode kode_barang + 7 digit) — tidak diketik manual.
+// Sejak migrasi 003: form tambah memilih KATEGORI lalu KODE BARANG (terfilter
+// mapping); kolom tabel bertambah "Kode Barang". Kelola kategori pindah ke
+// menu Product Management.
 import { useEffect, useState } from 'react';
-import type { Barang, Kategori } from '../types';
+import type { Barang, KodeBarang } from '../types';
 import { BadgeStok, Input, LabelForm, Modal, PesanGalat, Tombol } from '../components/ui';
-import { daftarKategoriAktif } from '../features/kategori/service-kategori';
+import {
+  daftarKategoriDenganRingkasan,
+  type KategoriRingkasan,
+} from '../features/kategori/service-kategori';
+import {
+  daftarKodeAktifUntukKategori,
+  kodeBerikutnya,
+} from '../features/kode-barang/service-kode-barang';
 import {
   daftarSemuaBarang,
   formatRupiah,
@@ -12,11 +22,11 @@ import {
   tambahBarangBaru,
 } from '../features/barang/service-barang';
 import { unduhBackup } from '../lib/backup';
-import KelolaKategori from './KelolaKategori';
 
 interface FormBarang {
   nama: string;
   kategori_id: number;
+  kode_barang_id: number;
   harga_beli: string;
   harga_jual: string;
   stok_awal: string;
@@ -27,6 +37,7 @@ interface FormBarang {
 const FORM_KOSONG: FormBarang = {
   nama: '',
   kategori_id: 0,
+  kode_barang_id: 0,
   harga_beli: '0',
   harga_jual: '0',
   stok_awal: '0',
@@ -37,25 +48,28 @@ const FORM_KOSONG: FormBarang = {
 export default function BarangPage({
   namaPengguna,
   tampilToast,
+  onKeProductManagement,
 }: {
   namaPengguna: string;
   tampilToast: (pesan: string) => void;
+  onKeProductManagement: () => void;
 }) {
   const [daftar, setDaftar] = useState<Barang[]>([]);
-  const [kategori, setKategori] = useState<Kategori[]>([]);
+  const [kategori, setKategori] = useState<KategoriRingkasan[]>([]);
   const [cari, setCari] = useState('');
   const [galat, setGalat] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [showKategori, setShowKategori] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<FormBarang>(FORM_KOSONG);
+  const [kodeTersedia, setKodeTersedia] = useState<KodeBarang[]>([]);
+  const [previewKode, setPreviewKode] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
 
   async function muat() {
     try {
-      const [b, k] = await Promise.all([daftarSemuaBarang(cari), daftarKategoriAktif()]);
+      const [b, k] = await Promise.all([daftarSemuaBarang(cari), daftarKategoriDenganRingkasan()]);
       setDaftar(b);
-      setKategori(k);
+      setKategori(k.filter((x) => x.aktif === 1));
       setGalat(null);
     } catch {
       setGalat('Gagal memuat data barang.');
@@ -75,11 +89,33 @@ export default function BarangPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cari]);
 
+  /** Pilih kategori di form tambah: muat kode ter-mapping, auto-fill bila hanya 1 (Q3). */
+  async function pilihKategori(id: number) {
+    setNilai('kategori_id', id);
+    setNilai('kode_barang_id', 0);
+    setPreviewKode(null);
+    const daftarKode = await daftarKodeAktifUntukKategori(id);
+    setKodeTersedia(daftarKode);
+    if (daftarKode.length === 1) {
+      setNilai('kode_barang_id', daftarKode[0].id);
+      setPreviewKode(await kodeBerikutnya(daftarKode[0].id));
+    }
+  }
+
+  async function pilihKodeBarang(id: number) {
+    setNilai('kode_barang_id', id);
+    setPreviewKode(id ? await kodeBerikutnya(id) : null);
+  }
+
   function bukaTambah() {
     setEditId(null);
-    setForm({ ...FORM_KOSONG, kategori_id: kategori[0]?.id ?? 0 });
+    const pertama = kategori[0];
+    setForm({ ...FORM_KOSONG, kategori_id: pertama?.id ?? 0 });
+    setKodeTersedia([]);
+    setPreviewKode(null);
     setGalat(null);
     setShowForm(true);
+    if (pertama) void pilihKategori(pertama.id);
   }
 
   function bukaUbah(b: Barang) {
@@ -87,12 +123,15 @@ export default function BarangPage({
     setForm({
       nama: b.nama,
       kategori_id: b.kategori_id,
+      kode_barang_id: b.kode_barang_id,
       harga_beli: String(b.harga_beli),
       harga_jual: String(b.harga_jual),
       stok_awal: String(b.stok_awal),
       stok_minimum: String(b.stok_minimum),
       keterangan: b.keterangan ?? '',
     });
+    setKodeTersedia([]);
+    setPreviewKode(null);
     setGalat(null);
     setShowForm(true);
   }
@@ -114,6 +153,7 @@ export default function BarangPage({
         {
           nama: form.nama,
           kategori_id: form.kategori_id,
+          kode_barang_id: form.kode_barang_id,
           harga_beli: angka(form.harga_beli),
           harga_jual: angka(form.harga_jual),
           stok_awal: angka(form.stok_awal),
@@ -171,6 +211,9 @@ export default function BarangPage({
     }
   }
 
+  const kategoriDipilih = kategori.find((k) => k.id === form.kategori_id);
+  const kategoriTanpaKode = editId === null && kategoriDipilih && kategoriDipilih.jml_kode === 0;
+
   return (
     <div className="layar">
       <h2 className="judul-layar">Daftar Barang</h2>
@@ -186,12 +229,14 @@ export default function BarangPage({
         <Tombol varian="outline" onClick={backupSekarang} title="Unduh salinan database (.db)">
           Unduh Backup
         </Tombol>
-        <Tombol varian="outline" onClick={() => setShowKategori(true)}>
-          Kategori
-        </Tombol>
         <Tombol varian="utama" onClick={bukaTambah}>
           + Tambah Barang
         </Tombol>
+      </div>
+      <div style={{ margin: '-8px 0 16px', textAlign: 'right' }}>
+        <span className="link-kecil" onClick={onKeProductManagement}>
+          Kelola di Product Management →
+        </span>
       </div>
 
       <div className="tabel-wrap">
@@ -199,6 +244,7 @@ export default function BarangPage({
           <thead>
             <tr>
               <th>Kode</th>
+              <th>Kode Barang</th>
               <th>Nama Barang</th>
               <th>Kategori</th>
               <th className="angka">Stok</th>
@@ -214,6 +260,9 @@ export default function BarangPage({
               <tr key={b.id} className={b.status_stok === 'menipis' ? 'menipis' : ''}>
                 <td className="nowrap">
                   <span className="kode-mono">{b.kode}</span>
+                </td>
+                <td className="nowrap">
+                  <span className="kode-mono">{b.kode_barang_kode ?? '—'}</span>
                 </td>
                 <td>
                   <b>{b.nama}</b>
@@ -238,7 +287,7 @@ export default function BarangPage({
             ))}
             {daftar.length === 0 && (
               <tr>
-                <td colSpan={9} className="kosong">
+                <td colSpan={10} className="kosong">
                   {cari ? 'Tidak ada barang yang cocok.' : 'Belum ada barang. Klik "+ Tambah Barang".'}
                 </td>
               </tr>
@@ -247,39 +296,62 @@ export default function BarangPage({
         </table>
       </div>
 
-      {showKategori && (
-        <KelolaKategori
-          onTutup={() => {
-            setShowKategori(false);
-            muat();
-          }}
-        />
-      )}
-
       {showForm && (
         <Modal judul={editId === null ? 'Tambah Barang' : 'Ubah Barang'} onTutup={() => setShowForm(false)}>
           <PesanGalat pesan={galat} />
           <LabelForm>Nama Barang</LabelForm>
           <Input value={form.nama} onChange={(e) => setNilai('nama', e.target.value)} placeholder="cth: Kopi Tubruk 250g" />
-          <div className="form-grid">
-            <div>
-              <LabelForm>Kategori</LabelForm>
-              <select
-                className="select"
-                value={form.kategori_id}
-                disabled={editId !== null}
-                onChange={(e) => setNilai('kategori_id', Number(e.target.value))}
-              >
-                {kategori.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.nama} ({k.prefix_kode}0000001…)
-                  </option>
-                ))}
-              </select>
-              {editId === null && (
-                <div className="hint">Kode otomatis: prefix kategori + nomor urut 7 digit.</div>
+          {editId === null && (
+            <>
+              <div className="form-grid">
+                <div>
+                  <LabelForm>Kategori</LabelForm>
+                  <select
+                    className="select"
+                    value={form.kategori_id}
+                    onChange={(e) => void pilihKategori(Number(e.target.value))}
+                  >
+                    {kategori.map((k) => (
+                      <option key={k.id} value={k.id} disabled={k.jml_kode === 0}>
+                        {k.nama}
+                        {k.jml_kode === 0 ? ' (belum punya kode barang)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <LabelForm>Kode Barang</LabelForm>
+                  <select
+                    className="select"
+                    value={form.kode_barang_id}
+                    disabled={kodeTersedia.length === 0}
+                    onChange={(e) => void pilihKodeBarang(Number(e.target.value))}
+                  >
+                    <option value={0}>— pilih —</option>
+                    {kodeTersedia.map((kb) => (
+                      <option key={kb.id} value={kb.id}>
+                        {kb.kode} — {kb.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {kategoriTanpaKode ? (
+                <div className="warnbox">
+                  Kategori "{kategoriDipilih?.nama}" belum punya kode barang aktif. Hubungkan minimal 1
+                  kode barang di <b>Product Management → Mapping</b> sebelum kategori ini bisa dipakai.
+                </div>
+              ) : (
+                previewKode && (
+                  <div className="previewbox">
+                    <div className="plabel">Kode berikutnya (auto-generate, final)</div>
+                    <div className="pcode">{previewKode}</div>
+                  </div>
+                )
               )}
-            </div>
+            </>
+          )}
+          <div className="form-grid">
             <div>
               <LabelForm>Satuan</LabelForm>
               <Input value="pcs" disabled />

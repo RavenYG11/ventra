@@ -1,11 +1,17 @@
 // Repo barang — hanya SQL, tanpa logika bisnis.
 // Aturan: UI tidak boleh import file ini langsung — selalu lewat service-barang.ts.
+//
+// Sejak migrasi 003_kode_barang: counter nomor urut menempel di KODE BARANG
+// (bukan kategori). Pembuatan barang wajib memilih kode barang yang ter-mapping
+// ke kategorinya (M:N, keputusan Rama Q2).
 import { dapatkanDb } from '../../lib/db';
 import type { Barang } from '../../types';
 
 export interface BarangBaru {
   nama: string;
   kategori_id: number;
+  /** Kode barang yang dipakai — harus aktif & ter-mapping ke kategori. */
+  kode_barang_id: number;
   harga_beli: number;
   harga_jual: number;
   stok_awal: number;
@@ -33,74 +39,93 @@ export async function ambilBarang(id: number): Promise<Barang | null> {
 }
 
 /**
- * Tambah barang + generate kode — ATOMIK dalam SATU statement SQL.
+ * Tambah barang + generate kode.
  *
- * Kode = prefix_kode kategori + nomor urut 7 digit (cth. BRG-0000001).
+ * Kode = kode (prefix) kode_barang + nomor urut 7 digit (cth. BRG-0000001).
  * Bila stok_awal > 0, sekalian catat transaksi "Stok awal" (audit lengkap dari nol).
  * Mengembalikan kode yang ter-generate.
  *
- * KENAPA SATU STATEMENT (bukan BEGIN/COMMIT terpisah)?
- * Edisi WEB memakai SATU koneksi SQLite di main thread (lihat lib/db.ts) —
- * tidak ada connection pool seperti di edisi Tauri dulu, jadi BEGIN/COMMIT
- * lewat beberapa panggilan terpisah pun sebenarnya aman. Pola satu statement
- * tetap dipertahankan karena: (1) atomik menurut jaminan SQLite sendiri tanpa
- * bergantung pada perilaku koneksi; (2) pola yang sama dipakai untuk semua
- * tulis multi-tabel di Ventra (lihat v0.2: transaksi stok memakai pola CTE
- * yang sama); (3) satu round-trip = lebih cepat.
+ * CATATAN ARSITEKTUR (temuan assignment #28 — BUG LAMA DIPERBAIKI):
+ * pola lama memakai `WITH x AS (UPDATE ... RETURNING ...)` — ternyata SQLite
+ * TIDAK mendukung DML (INSERT/UPDATE/DELETE) di dalam klausa WITH (terbukti
+ * syntax error di sqlite-wasm 3.53.4, engine produksi). Artinya tambah barang
+ * TIDAK PERNAH bisa jalan dengan pola itu. Pola baru di bawah memakai
+ * `UPDATE ... RETURNING` LANGSUNG (tanpa WITH) — didukung SQLite 3.35+.
  *
- * Alur di dalam CTE (semua terjadi atomik):
- *  1. kategori_dinaikkan — UPDATE counter kategori (+1) secara atomik;
- *     mengembalikan prefix & nomor baru. Bila kategori tidak ada / nonaktif,
- *     CTE ini kosong → seluruh rantai ikut kosong → fungsi melempar galat.
- *  2. barang_baru — INSERT barang; kode dirakit di SQL
- *     (prefix || printf('%07d', nomor)) supaya konsisten dengan counter.
- *  3. transaksi_awal — INSERT baris "Stok awal"; hanya bila stok_awal > 0.
+ * Keamanan dari nomor ganda: (1) aplikasi memakai SATU koneksi SQLite
+ * (lib/db.ts — worker memproses pesan berurutan, tidak ada interleaving);
+ * (2) hanya satu tab boleh dibuka (BroadcastChannel); (3) satu pengguna.
+ * Langkah 1 (UPDATE...RETURNING) bersifat atomik sendiri — counter naik dan
+ * nilai baru terbaca dalam SATU statement, jadi tidak ada dua barang bisa
+ * mendapat nomor yang sama. Bila langkah 2 gagal (praktis tidak mungkin —
+ * kode unik global), hanya terjadi lompatan nomor (gap), bukan duplikat.
+ *
+ * Alur:
+ *  1. UPDATE counter kode_barang (+1) + RETURNING kode & nomor baru — atomik.
+ *     Syarat: kode aktif DAN ter-mapping ke kategori yang aktif. Bila tidak
+ *     terpenuhi, tidak ada baris → fungsi melempar galat.
+ *  2. INSERT barang; kode dirakit di JS (kode || 7-digit) dari nilai RETURNING.
+ *     Kolom kode_barang_id dicatat untuk audit pola penomoran.
+ *  3. INSERT baris "Stok awal"; hanya bila stok_awal > 0.
  */
 export async function tambahBarangAtomik(
   input: BarangBaru,
   dibuatOleh: string
 ): Promise<string> {
   const db = await dapatkanDb();
-  const baris = await db.select<Array<{ id: number; kode: string }>>(
-    `WITH kategori_dinaikkan AS (
-       UPDATE kategori
-          SET nomor_urut_terakhir = nomor_urut_terakhir + 1
-        WHERE id = $1 AND aktif = 1
-     RETURNING prefix_kode, nomor_urut_terakhir
-     ),
-     barang_baru AS (
-       INSERT INTO barang
-         (kode, nama, kategori_id, harga_beli, harga_jual, stok, stok_awal,
-          stok_minimum, keterangan, dibuat_pada, diubah_pada)
-       SELECT
-         k.prefix_kode || printf('%07d', k.nomor_urut_terakhir),
-         $2, $1, $3, $4, $5, $5, $6, $7, $8, $8
-         FROM kategori_dinaikkan AS k
-     RETURNING id, kode, stok_awal
-     ),
-     transaksi_awal AS (
-       INSERT INTO transaksi_stok
-         (barang_id, jenis, jumlah, stok_sebelum, stok_sesudah, keterangan,
-          dibuat_oleh, dibuat_pada)
-       SELECT b.id, 'masuk', b.stok_awal, 0, b.stok_awal, 'Stok awal', $9, $8
-         FROM barang_baru AS b
-        WHERE b.stok_awal > 0
-     )
-     SELECT id, kode FROM barang_baru`,
+
+  // Langkah 1 — naikkan counter + ambil kode & nomor baru (satu statement).
+  const naik = await db.select<Array<{ kode: string; nomor_urut_terakhir: number }>>(
+    `UPDATE kode_barang
+        SET nomor_urut_terakhir = nomor_urut_terakhir + 1
+      WHERE id = $2 AND aktif = 1
+        AND EXISTS (
+          SELECT 1 FROM kategori_kode_barang m
+          JOIN kategori k ON k.id = m.kategori_id
+          WHERE m.kode_barang_id = kode_barang.id
+            AND m.kategori_id = $1
+            AND k.aktif = 1
+        )
+      RETURNING kode, nomor_urut_terakhir`,
+    [input.kategori_id, input.kode_barang_id]
+  );
+  if (naik.length === 0) {
+    throw new Error('Kategori/kode barang tidak valid, nonaktif, atau belum terhubung.');
+  }
+  const kodeFinal = naik[0].kode + String(naik[0].nomor_urut_terakhir).padStart(7, '0');
+
+  // Langkah 2 — INSERT barang.
+  const hasilBarang = await db.execute(
+    `INSERT INTO barang
+       (kode, nama, kategori_id, kode_barang_id, harga_beli, harga_jual, stok, stok_awal,
+        stok_minimum, keterangan, dibuat_pada, diubah_pada)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $10)`,
     [
-      input.kategori_id, // $1
+      kodeFinal,
       input.nama.trim(), // $2
-      input.harga_beli, // $3
-      input.harga_jual, // $4
-      input.stok_awal, // $5
-      input.stok_minimum, // $6
-      input.keterangan?.trim() || null, // $7
-      new Date().toISOString(), // $8 — dibuat_pada & diubah_pada
-      dibuatOleh, // $9 — audit: siapa yang mencatat
+      input.kategori_id, // $3
+      input.kode_barang_id, // $4
+      input.harga_beli, // $5
+      input.harga_jual, // $6
+      input.stok_awal, // $7
+      input.stok_minimum, // $8
+      input.keterangan?.trim() || null, // $9
+      new Date().toISOString(), // $10 — dibuat_pada & diubah_pada
     ]
   );
-  if (baris.length === 0) throw new Error('Kategori tidak valid atau sudah nonaktif.');
-  return baris[0].kode;
+
+  // Langkah 3 — transaksi "Stok awal" bila ada.
+  if (input.stok_awal > 0) {
+    await db.execute(
+      `INSERT INTO transaksi_stok
+         (barang_id, jenis, jumlah, stok_sebelum, stok_sesudah, keterangan,
+          dibuat_oleh, dibuat_pada)
+       VALUES ($1, 'masuk', $2, 0, $2, 'Stok awal', $3, $4)`,
+      [Number(hasilBarang.lastInsertId), input.stok_awal, dibuatOleh, new Date().toISOString()]
+    );
+  }
+
+  return kodeFinal;
 }
 
 export interface BarangUbah {
@@ -112,7 +137,7 @@ export interface BarangUbah {
 }
 
 /**
- * Ubah barang — kode, kategori, dan stok TIDAK bisa diubah di sini
+ * Ubah barang — kode, kategori, kode barang, dan stok TIDAK bisa diubah di sini
  * (kode final; stok hanya berubah lewat transaksi_stok mulai v0.2).
  */
 export async function ubahBarang(id: number, input: BarangUbah): Promise<void> {

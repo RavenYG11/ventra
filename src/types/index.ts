@@ -1,9 +1,23 @@
 // Tipe data bersama Ventra — cerminan specs/model-data.md.
+// Revisi 14 Okt 2026 (migrasi 003_kode_barang): prefix & counter pindah dari
+// kategori ke entitas kode_barang; relasi kategori<->kode_barang M:N.
 
 export interface Kategori {
   id: number;
   nama: string;
-  prefix_kode: string;
+  aktif: number;
+  dibuat_pada: string;
+}
+
+/** Satu pola kode (prefix + counter-nya sendiri). */
+export interface KodeBarang {
+  id: number;
+  /** Prefix unik global, pola [A-Z0-9-], 1–10 karakter. */
+  kode: string;
+  /** Nama tampilan untuk dropdown, 1–50 karakter. */
+  nama: string;
+  keterangan: string | null;
+  /** Counter internal — hanya naik lewat pembuatan barang (atomik). */
   nomor_urut_terakhir: number;
   aktif: number;
   dibuat_pada: string;
@@ -13,11 +27,15 @@ export type StatusStok = 'aman' | 'menipis' | 'habis';
 
 export interface Barang {
   id: number;
-  /** Kode unik auto-generate (prefix kategori + 7 digit). Barcode = kode. */
+  /** Kode unik auto-generate (kode kode_barang + 7 digit). Barcode = kode. */
   kode: string;
   nama: string;
   kategori_id: number;
   kategori_nama?: string;
+  /** Kode barang mana yang menghasilkan kode ini (audit pola penomoran). */
+  kode_barang_id: number;
+  /** Nilai prefix untuk kolom tampilan (dari v_barang). */
+  kode_barang_kode?: string;
   satuan: string; // selalu 'pcs'
   harga_beli: number;
   harga_jual: number;

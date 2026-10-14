@@ -1,67 +1,70 @@
 // Service kategori — validasi + aturan CRUD kategori.
+// Sejak migrasi 003_kode_barang: form kategori hanya berisi NAMA
+// (prefix & counter pindah ke entitas kode_barang).
 import type { Hasil, Kategori } from '../../types';
 import {
   daftarKategori,
+  daftarKategoriRingkasan,
+  hitungBarangDiKategori,
   nonaktifkanKategori,
   tambahKategori,
   ubahKategori,
+  type KategoriRingkasan,
 } from './repo-kategori';
 
-function validasiPrefix(prefix: string): string | null {
-  const p = prefix.trim().toUpperCase();
-  if (!/^[A-Z0-9-]{1,10}$/.test(p)) {
-    return 'Prefix 1–10 karakter: huruf kapital, angka, strip (tanpa spasi).';
-  }
-  return null;
-}
+export type { KategoriRingkasan };
 
 export async function daftarKategoriAktif(): Promise<Kategori[]> {
   return daftarKategori(false);
 }
 
-export async function buatKategori(nama: string, prefixKode: string): Promise<Hasil<number>> {
-  if (nama.trim().length < 1 || nama.trim().length > 50) {
-    return { ok: false, galat: 'Nama kategori 1–50 karakter.' };
-  }
-  const v = validasiPrefix(prefixKode);
+export async function daftarKategoriDenganRingkasan(): Promise<KategoriRingkasan[]> {
+  return daftarKategoriRingkasan();
+}
+
+function validasiNama(nama: string): string | null {
+  const n = nama.trim();
+  if (n.length < 1 || n.length > 50) return 'Nama kategori 1–50 karakter.';
+  return null;
+}
+
+export async function buatKategori(nama: string): Promise<Hasil<number>> {
+  const v = validasiNama(nama);
   if (v) return { ok: false, galat: v };
   try {
-    const id = await tambahKategori(nama, prefixKode);
+    const id = await tambahKategori(nama);
     return { ok: true, data: id };
   } catch {
-    return { ok: false, galat: 'Nama atau prefix sudah dipakai kategori lain.' };
+    return { ok: false, galat: 'Nama kategori sudah dipakai.' };
   }
 }
 
-export async function suntingKategori(
-  id: number,
-  nama: string,
-  prefixKode: string
-): Promise<Hasil<void>> {
-  if (nama.trim().length < 1 || nama.trim().length > 50) {
-    return { ok: false, galat: 'Nama kategori 1–50 karakter.' };
-  }
-  const v = validasiPrefix(prefixKode);
+export async function suntingKategori(id: number, nama: string): Promise<Hasil<void>> {
+  const v = validasiNama(nama);
   if (v) return { ok: false, galat: v };
-  // Prefix BOLEH diubah (keputusan final model-data.md §2 aturan 5):
-  // kode barang yang sudah terbit TIDAK berubah (historis) —
-  // hanya barang baru yang memakai prefix baru. Counter tidak di-reset.
   try {
-    await ubahKategori(id, nama, prefixKode);
+    await ubahKategori(id, nama);
     return { ok: true };
   } catch {
-    return { ok: false, galat: 'Nama atau prefix sudah dipakai kategori lain.' };
+    return { ok: false, galat: 'Nama kategori sudah dipakai.' };
   }
 }
 
 /**
- * Nonaktifkan kategori (soft delete) — SELALU boleh, walau masih punya barang.
- * Barang lama yang merujuknya tetap utuh (riwayat tidak patah); kategori
- * nonaktif disembunyikan dari pilihan dan tidak bisa dipakai barang baru.
+ * Nonaktifkan kategori (soft delete) — DITOLAK bila masih punya barang aktif
+ * (mockup Product Management, mengikat). Kategori yang sudah kosong boleh
+ * dinonaktifkan; barang lama yang merujuk kategori nonaktif tetap utuh.
  * Hapus permanen kategori yang masih punya barang ditolak database
  * (ON DELETE RESTRICT) — tidak ada jalur hapus permanen di aplikasi.
  */
 export async function hapusKategori(id: number): Promise<Hasil<void>> {
+  const jml = await hitungBarangDiKategori(id);
+  if (jml > 0) {
+    return {
+      ok: false,
+      galat: `DITOLAK: kategori masih punya ${jml} barang aktif. Nonaktifkan dulu barang-barangnya.`,
+    };
+  }
   await nonaktifkanKategori(id);
   return { ok: true };
 }
