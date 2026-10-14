@@ -71,7 +71,10 @@ type MuatSqlite3 = (
 ) => Promise<Sqlite3Api>;
 
 // Nama file database di OPFS. VFS opfs-sahpool MEWAJIBKAN path absolut.
-const NAMA_FILE_DB = '/stok.db';
+// VENTRA SIMPLE (2026-10-14): file BARU /ventra-simple.db — skema lama
+// (/stok.db + migrasi 001/002/003) tidak dibawa sama sekali, jadi tidak ada
+// risiko wipe/migrasi setengah jalan. File lama tetap utuh di OPFS.
+const NAMA_FILE_DB = '/ventra-simple.db';
 
 let pool: PoolUtil | null = null;
 let db: DbWasm | null = null;
@@ -86,10 +89,8 @@ let db: DbWasm | null = null;
 let muatSqlite3: MuatSqlite3 | null = null;
 /** URL file sqlite3.wasm setelah di-bundle Vite (pola ?url = aset statis). */
 let urlWasm = '';
-/** Isi mentah file migrasi SQL (pola ?raw = teks mentah Vite). */
-let teksMigrasi001 = '';
-let teksMigrasi002 = '';
-let teksMigrasi003 = '';
+/** Isi skema fresh Ventra Simple (pola ?raw = teks mentah Vite). */
+let teksSkema = '';
 
 // ---------------------------------------------------------------------------
 // Diagnostik: tangkap error runtime yang lolos dari handler pesan.
@@ -209,18 +210,12 @@ async function initDb(): Promise<void> {
     const m1 = await import('@sqlite.org/sqlite-wasm');
     modulGagal = '@sqlite.org/sqlite-wasm/sqlite3.wasm?url';
     const m2 = await import('@sqlite.org/sqlite-wasm/sqlite3.wasm?url');
-    modulGagal = 'migrasi/001_awal.sql';
-    const m3 = await import('../../migrasi/001_awal.sql?raw');
-    modulGagal = 'migrasi/002_audit_keamanan.sql';
-    const m4 = await import('../../migrasi/002_audit_keamanan.sql?raw');
-    modulGagal = 'migrasi/003_kode_barang.sql';
-    const m5 = await import('../../migrasi/003_kode_barang.sql?raw');
+    modulGagal = 'migrasi/ventra-simple.sql';
+    const m3 = await import('../../migrasi/ventra-simple.sql?raw');
     // Ambil default export tiap modul (pola Vite: ?url/?raw → string).
     muatSqlite3 = m1.default as unknown as MuatSqlite3;
     urlWasm = m2.default;
-    teksMigrasi001 = m3.default;
-    teksMigrasi002 = m4.default;
-    teksMigrasi003 = m5.default;
+    teksSkema = m3.default;
   } catch (e) {
     const sebab = e instanceof Error ? e.message : String(e);
     const rincian = 'import "' + modulGagal + '" gagal: ' + sebab;
@@ -283,11 +278,11 @@ async function initDb(): Promise<void> {
     throw galatFase('DB_OPEN_FAILED', e);
   }
 
-  // FASE 4 — jalankan migrasi skema.
+  // FASE 4 — terapkan skema fresh Ventra Simple.
   try {
     const koneksi = db;
-    if (!koneksi) throw new Error('Koneksi null sebelum migrasi.');
-    jalankanMigrasi(koneksi);
+    if (!koneksi) throw new Error('Koneksi null sebelum skema.');
+    terapkanSkemaAwal(koneksi);
   } catch (e) {
     throw galatFase('MIGRATION_FAILED', e);
   }
@@ -309,80 +304,33 @@ function normalisasiParam(sql: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Migrasi skema — skema DB TIDAK berubah dari edisi Tauri (keputusan pivot).
+// Skema database — VENTRA SIMPLE (2026-10-14): satu skrip fresh
+// (migrasi/ventra-simple.sql), bukan rantai migrasi lama. Skema dijalankan di
+// file DB BARU /ventra-simple.db; idempoten (CREATE TABLE IF NOT EXISTS).
 // ---------------------------------------------------------------------------
 
 /**
- * IDEMPOTEN (QA #33, temuan 1): apakah SEMUA efek migrasi 003 sudah ada di DB?
- * Dipakai bila eksekusi migrasi 003 melempar — untuk membedakan dua kasus:
- *  (a) "gagal di tengah" → ROLLBACK sudah membatalkan semuanya → retry bersih;
- *  (b) "COMMIT sukses tapi proses mati sebelum baris kode berikutnya jalan"
- *      (tab tertutup tepat saat COMMIT) → efek SUDAH permanen di disk.
- * Tanda yang dipakai: kolom barang.kode_barang_id. Kolom ini ditambahkan di
- * langkah 5 DALAM transaksi yang sama; karena DDL SQLite transaksional
- * (all-or-nothing), kolom hanya ada bila SELURUH skrip sudah COMMIT.
- * Tanpa guard ini, retry kasus (b) gagal "duplicate column name" selamanya.
+ * Terapkan skema fresh Ventra Simple, atomik dalam SATU transaksi.
+ * Gagal di tengah = batal total (ROLLBACK). Baris versi dicatat agar
+ * perubahan skema di masa depan bisa dibedakan; INSERT OR IGNORE membuat
+ * retry aman.
  */
-function efekMigrasi003SudahAda(database: DbWasm): boolean {
-  try {
-    const baris = database.selectObjects(
-      "SELECT COUNT(*) AS n FROM pragma_table_info('barang') WHERE name = 'kode_barang_id'"
-    ) as Array<{ n: number }>;
-    return Number(baris[0]?.n ?? 0) > 0;
-  } catch {
-    // Bila pengecekan sendiri gagal, jangan menebak — perlakukan sebagai gagal.
-    return false;
+function terapkanSkemaAwal(database: DbWasm): void {
+  if (!teksSkema) {
+    throw new Error('Skema ventra-simple.sql kosong — bundler tidak menyertakan file SQL (cek pola ?raw).');
   }
-}
-
-function jalankanMigrasi(database: DbWasm): void {
-  // Daftar migrasi dibangun DI SINI (bukan const tingkat atas) karena isi
-  // SQL baru tersedia setelah FASE IMPORT_FAILED selesai.
-  const daftarMigrasi: Array<[versi: string, sql: string]> = [
-    ['001_awal', teksMigrasi001],
-    ['002_audit_keamanan', teksMigrasi002],
-    ['003_kode_barang', teksMigrasi003],
-  ];
-  database.exec(
-    `CREATE TABLE IF NOT EXISTS migrasi (
-       versi TEXT PRIMARY KEY,
-       diterapkan_pada TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-     )`
-  );
-  const sudah = database.selectObjects('SELECT versi FROM migrasi') as Array<{ versi: string }>;
-  const terapkan = new Set(sudah.map((r) => r.versi));
-  for (const [versi, sql] of daftarMigrasi) {
-    if (terapkan.has(versi)) continue;
-    // ATOMIK (QA MIG-07, temuan #33-1): tiap migrasi berjalan dalam SATU
-    // transaksi — BEGIN → skrip SQL → catat versi → COMMIT. Gagal di tengah =
-    // batal total (ROLLBACK): tidak ada perubahan setengah jalan DAN baris
-    // versi tidak tercatat, sehingga retry berikutnya mulai dari kondisi
-    // bersih. Pencatatan versi SENGAJA di dalam transaksi yang sama agar
-    // tidak ada jeda "COMMIT sukses tapi versi belum tercatat".
-    // (db.exec menerima SQL multi-statement sekaligus.)
+  database.exec('BEGIN IMMEDIATE;');
+  try {
+    database.exec(teksSkema);
+    database.exec({ sql: 'INSERT OR IGNORE INTO migrasi (versi) VALUES (?)', bind: ['ventra-simple'] });
+    database.exec('COMMIT;');
+  } catch (e) {
     try {
-      database.exec('BEGIN IMMEDIATE;');
-      database.exec(sql);
-      database.exec({ sql: 'INSERT INTO migrasi (versi) VALUES (?)', bind: [versi] });
-      database.exec('COMMIT;');
-    } catch (e) {
-      try {
-        database.exec('ROLLBACK;');
-      } catch {
-        // Abaikan — tidak ada transaksi terbuka yang bisa di-rollback.
-      }
-      // IDEMPOTEN (temuan #33-1): kasus (b) di efekMigrasi003SudahAda() —
-      // anggap migrasi selesai, pastikan versi tercatat, lanjutkan ke
-      // migrasi berikut. Bukan gagal permanen.
-      if (versi === '003_kode_barang' && efekMigrasi003SudahAda(database)) {
-        database.exec({
-          sql: 'INSERT OR IGNORE INTO migrasi (versi) VALUES (?)',
-          bind: [versi],
-        });
-        continue;
-      }
-      throw e;
+      database.exec('ROLLBACK;');
+    } catch {
+      // Abaikan — tidak ada transaksi terbuka yang bisa di-rollback.
     }
+    throw e;
   }
 }
 

@@ -1,1 +1,25 @@
-{"dependencies":{"@sqlite.org/sqlite-wasm":"3.53.4-build2","@zxing/browser":"^0.1.5","bcryptjs":"^3.0.2","jsbarcode":"^3.8.0","jspdf":"^2.5.2","jspdf-autotable":"^3.8.4","react":"^18.3.1","react-dom":"^18.3.1","xlsx":"^0.18.5"},"description":"Ventra — aplikasi stock barang sederhana (web offline, React + SQLite WASM)","devDependencies":{"@types/react":"^18.3.12","@types/react-dom":"^18.3.1","@vitejs/plugin-react":"^4.3.4","typescript":"~5.6.2","vite":"^6.0.3"},"name":"ventra","private":true,"scripts":{"build":"tsc && vite build","dev":"vite","preview":"vite preview"},"type":"module","version":"0.1.0"}
+{
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "3.53.4-build2",
+    "bcryptjs": "^3.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "description": "Ventra Simple — aplikasi stock barang super-sederhana (web offline, React + SQLite WASM)",
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  },
+  "name": "ventra",
+  "private": true,
+  "scripts": {
+    "build": "tsc && vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
