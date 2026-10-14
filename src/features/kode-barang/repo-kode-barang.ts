@@ -11,7 +11,15 @@ export async function daftarKodeBarang(termasukNonaktif = false): Promise<KodeBa
 }
 
 export interface KodeBarangRingkasan extends KodeBarang {
+  /** Jumlah barang AKTIF yang memakai kode ini — untuk kolom "Jml Barang". */
   jml_barang: number;
+  /**
+   * Jumlah SEMUA barang (aktif + nonaktif) yang pernah memakai kode ini.
+   * Untuk mengunci field "kode" di form Ubah — SELARAS dengan service
+   * `suntingKodeBarang` yang memakai `hitungSemuaBarangDiKodeBarang`
+   * (QA BUG-5: field terkunci bila dipakai barang APAPUN, bukan cuma yang aktif).
+   */
+  jml_barang_semua: number;
   jml_kategori: number;
 }
 
@@ -21,6 +29,7 @@ export async function daftarKodeBarangRingkasan(): Promise<KodeBarangRingkasan[]
   return db.select<KodeBarangRingkasan[]>(
     `SELECT kb.*,
        (SELECT COUNT(*) FROM barang b WHERE b.kode_barang_id = kb.id AND b.aktif = 1) AS jml_barang,
+       (SELECT COUNT(*) FROM barang b WHERE b.kode_barang_id = kb.id) AS jml_barang_semua,
        (SELECT COUNT(*) FROM kategori_kode_barang m WHERE m.kode_barang_id = kb.id) AS jml_kategori
      FROM kode_barang kb
      ORDER BY kb.kode`
@@ -118,6 +127,12 @@ export interface InfoMapping {
   terhubung: KodeBarang[];
   /** Kode AKTIF yang belum terhubung ke kategori ini (boleh dari kategori lain — M:N). */
   tersedia: KodeBarang[];
+  /**
+   * Peta kode_barang_id -> nama-nama kategori LAIN (bukan kategori ini)
+   * yang juga memakai kode tersebut. Untuk label "juga dipakai: ..."
+   * di daftar "Tersedia" tab Mapping — sesuai mockup (QA BUG-7).
+   */
+  pemakaiLain: Record<number, string[]>;
 }
 
 export async function infoMapping(kategoriId: number): Promise<InfoMapping> {
@@ -136,7 +151,21 @@ export async function infoMapping(kategoriId: number): Promise<InfoMapping> {
      ORDER BY kb.kode`,
     [kategoriId]
   );
-  return { kategori_id: kategoriId, terhubung, tersedia };
+  // Kategori lain (bukan yang sedang dipilih) pemakai tiap kode —
+  // satu query untuk semua kode, dirakit jadi peta di bawah.
+  const barisPemakai = await db.select<Array<{ kode_barang_id: number; nama_kategori: string }>>(
+    `SELECT m.kode_barang_id, kat.nama AS nama_kategori
+     FROM kategori_kode_barang m
+     JOIN kategori kat ON kat.id = m.kategori_id
+     WHERE m.kategori_id <> $1
+     ORDER BY kat.nama`,
+    [kategoriId]
+  );
+  const pemakaiLain: Record<number, string[]> = {};
+  for (const b of barisPemakai) {
+    (pemakaiLain[b.kode_barang_id] ??= []).push(b.nama_kategori);
+  }
+  return { kategori_id: kategoriId, terhubung, tersedia, pemakaiLain };
 }
 
 export async function hubungkanMapping(kategoriId: number, kodeBarangId: number): Promise<void> {

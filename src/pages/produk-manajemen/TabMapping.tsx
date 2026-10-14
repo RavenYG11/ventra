@@ -126,19 +126,34 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
           <div className="tabel-wrap">
             <table className="grid">
               <tbody>
-                {tersedia.map((k) => (
-                  <tr key={k.id}>
-                    <td>
-                      <span className="kode-mono">{k.kode}</span>
-                      <div className="hint">{k.nama}</div>
-                    </td>
-                    <td className="nowrap" style={{ textAlign: 'right' }}>
-                      <Tombol varian="outline" onClick={() => hubungkan(k.id, k.kode)}>
-                        Hubungkan
-                      </Tombol>
-                    </td>
-                  </tr>
-                ))}
+                {tersedia.map((k) => {
+                  // Label "juga dipakai: ..." — kode yang sudah dipakai kategori lain
+                  // (counter shared, M:N). Sesuai mockup (QA BUG-7).
+                  const dipakaiLain = info?.pemakaiLain[k.id] ?? [];
+                  return (
+                    <tr key={k.id}>
+                      <td>
+                        <span className="kode-mono">{k.kode}</span>
+                        <div className="hint">
+                          {k.nama}
+                          {dipakaiLain.length > 0 && (
+                            <>
+                              {' '}·{' '}
+                              <b className="teks-amber">
+                                juga dipakai: {dipakaiLain.join(', ')}
+                              </b>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="nowrap" style={{ textAlign: 'right' }}>
+                        <Tombol varian="outline" onClick={() => hubungkan(k.id, k.kode)}>
+                          Hubungkan
+                        </Tombol>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {tersedia.length === 0 && (
                   <tr>
                     <td className="kosong">Tidak ada kode tersedia.</td>

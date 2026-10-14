@@ -50,7 +50,10 @@ export default function TabKodeBarang({ tampilToast }: { tampilToast: (p: string
     setKode(k.kode);
     setNama(k.nama);
     setKeterangan(k.keterangan ?? '');
-    setEditPernahDipakai(k.jml_barang > 0);
+    // Kunci field "kode" bila dipakai barang APAPUN (aktif maupun nonaktif) —
+    // selaras dengan service suntingKodeBarang (QA BUG-5). Pakai
+    // jml_barang_semua, BUKAN jml_barang (yang hanya hitung yang aktif).
+    setEditPernahDipakai(k.jml_barang_semua > 0);
     setGalat(null);
     setGalatKode(null);
   }

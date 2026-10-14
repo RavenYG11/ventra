@@ -67,6 +67,8 @@ body {
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .kode-mono { font-family: Consolas, monospace; font-size: 13px; color: var(--blue); }
+/* Teks penekanan amber — mis. label "juga dipakai: ..." di tab Mapping. */
+.teks-amber { color: var(--amber); }
 
 /* ---------- Tombol ---------- */
 .tombol {
