@@ -136,14 +136,17 @@ async function inisialisasi(): Promise<DbVentra> {
     throw new Error('Browser ini tidak mendukung penyimpanan database lokal (OPFS).');
   }
   // CATATAN (assignment #20, 2026-10-14): opsi `preserveOnInitFailure` — agar
-  // init yang gagal TIDAK me-wipe storage (perilaku default = removeVfs()) —
-  // baru tersedia di sqlite-wasm 3.54 (lihat sqlite.org/wasm/doc/trunk/
-  // persistence.md). Versi 3.54 BELUM terbit di npm (maksimum 3.53.4-build2
-  // per 2026-10-14), jadi flag ini BELUM dipakai. Saat 3.54 tersedia:
-  // upgrade package.json, lalu panggil installOpfsSAHPoolVfs({
-  // preserveOnInitFailure: true }).
+  // init VFS yang gagal TIDAK me-wipe storage (perilaku default = removeVfs())
+  // — baru didukung sqlite-wasm 3.54 (lihat sqlite.org/wasm/doc/tip/
+  // persistence.md, "Persistent Storage Options"). Versi 3.54 BELUM terbit di
+  // npm (maksimum 3.53.4-build2 per 2026-10-14 — diverifikasi langsung dari
+  // dist paket: string "preserveOnInitFailure" tidak ada di 3.53.4, sehingga
+  // flag ini DIABAIKAN DENGAN AMAN di versi lama). Flag diteruskan SEKARANG
+  // agar proteksi anti-wipe AKTIF OTOMATIS begitu package.json di-upgrade ke
+  // ≥3.54 (lakukan via `npm install @sqlite.org/sqlite-wasm@^3.54` segera
+  // setelah 3.54 tersedia di npm).
   try {
-    pool = await sqlite3.installOpfsSAHPoolVfs();
+    pool = await sqlite3.installOpfsSAHPoolVfs({ preserveOnInitFailure: true });
   } catch (e) {
     // JANGAN telan error asli — tampilkan agar bisa didiagnosis.
     const sebab = e instanceof Error ? e.message : String(e);
@@ -295,3 +298,4 @@ export async function eksporDatabase(): Promise<Uint8Array> {
   if (!pool) throw new Error('Database belum terinisialisasi.');
   return pool.exportFile(NAMA_FILE_DB);
 }
+
