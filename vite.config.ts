@@ -12,10 +12,19 @@ export default defineConfig({
   build: {
     target: 'es2021',
   },
-  // Catatan: header COOP/COEP SENGAJA tidak dipasang. VFS opfs-sahpool
-  // yang dipakai Ventra tidak mewajibkannya
-  // (sqlite.org/wasm/doc/trunk/persistence.md), dan COEP require-corp
-  // berisiko memblokir pemuatan sqlite3.wasm di dev server.
+  server: {
+    // Header COOP/COEP — WAJIB ADA, jangan dihapus (pelajaran 2026-10-14).
+    // Alasan: (1) VFS opfs-sahpool memakai SharedArrayBuffer + Atomics untuk
+    // koordinasi sinkron → butuh cross-origin isolation; (2) Chrome MENOLAK
+    // memuat Web Worker bila dokumen terisolasi tetapi script worker tidak
+    // membawa header COEP yang cocok — penolakannya berupa ErrorEvent KOSONG
+    // (pesan "", file unknown) sehingga mustahil didiagnosis tanpa ini.
+    // Vite menerapkan server.headers ke SEMUA respons dev termasuk worker.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   worker: {
     // Format ES module untuk Web Worker database (src/lib/db-worker.ts) —
     // pola resmi Vite untuk `new Worker(new URL('./x.ts', import.meta.url))`.

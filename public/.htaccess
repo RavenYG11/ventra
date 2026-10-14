@@ -1,0 +1,7 @@
+# Ventra — header keamanan untuk deploy XAMPP (http://localhost/ventra).
+# WAJIB: tanpa COOP/COEP, Chrome menolak memuat Web Worker database
+# (lihat vite.config.ts). File ini ikut ter-copy via public/ → dist/.
+<IfModule mod_headers.c>
+    Header set Cross-Origin-Opener-Policy "same-origin"
+    Header set Cross-Origin-Embedder-Policy "require-corp"
+</IfModule>
