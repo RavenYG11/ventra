@@ -99,7 +99,7 @@ kembali ke `db.ts`. File `db.ts` hanyalah proxy via `postMessage`.
 | `VDB-W01` | Worker crash saat load modul (import/bundling gagal). Detail: pesan, file, baris, kolom | Klik **Salin detail teknis**, kirim ke tim |
 | `VDB-W02` | Error runtime tak tertangkap di dalam worker | Klik **Salin detail teknis**, kirim ke tim |
 | `VDB-W03` | Inisialisasi melebihi 15 detik (timeout) | Muat ulang; bila tetap, tutup semua tab Ventra |
-| `[IMPORT_FAILED]` | Salah satu modul worker gagal di-load Vite (paket sqlite-wasm / sqlite3.wasm?url / migrasi ?raw) | Lihat pesan asli di layar (bagian dalam kurung); klik **Salin detail teknis** |
+| `[IMPORT_FAILED]` | Satu/lebih modul worker gagal dimuat via dynamic import — kini menampilkan nama modul + pesan asli (bukan crash bisu) | Lihat detail teknis, kirim ke tim |
 | `[WASM_LOAD_FAILED]` | `sqlite3.wasm` gagal dimuat (URL kosong/404) | `npm install` ulang; pastikan `dist/sqlite3.wasm` ada setelah build |
 | `[OPFS_UNAVAILABLE]` | OPFS tidak bisa dibaca/ditulis (private mode, profil rusak, disk penuh) | Pakai window normal (bukan incognito); cek ruang disk |
 | `[VFS_INSTALL_FAILED]` | Install VFS gagal | Lihat detail teknis |

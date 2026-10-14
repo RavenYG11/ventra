@@ -17,12 +17,15 @@
 // memastikan OPFS bisa ditulis SEBELUM install VFS (anti-wipe: init VFS yang
 // gagal bisa me-wipe storage bila tanpa preserveOnInitFailure).
 //
-// DIAGNOSIS IMPORT (assignment #23, 2026-10-14): bukti console Rama bersih
-// (tanpa 404) + VDB-W01 pesan kosong = worker gagal di FASE EVALUASI MODUL.
-// Static import yang gagal tidak bisa di-try/catch, jadi keempat modul
-// (paket sqlite-wasm, sqlite3.wasm?url, 2 migrasi ?raw) dimuat via DYNAMIC
-// IMPORT di FASE 0 dalam try/catch → gagal load = [IMPORT_FAILED] + pesan
-// asli → tampil sebagai VDB-W02 di main thread.
+// DIAGNOSIS TERTARGET (assignment #23, 2026-10-14): [VDB-W01] pesan kosong +
+// file tidak diketahui = worker gagal di FASE EVALUASI MODUL (static import),
+// sebelum kode apa pun jalan; console Rama bersih tanpa 404. Static import
+// tidak bisa di-try/catch — satu-satunya cara membuat kegagalannya terlihat
+// adalah DYNAMIC IMPORT. Karena itu 4 static import tingkat atas DIHAPUS;
+// initDb() memuat semuanya di TAHAP PALING AWAL via dynamic import di dalam
+// try/catch berlabel IMPORT_FAILED. Bila Vite gagal mentransform salah satu
+// modul, error ASLI kini tertangkap → postMessage {id:-1,
+// fase:'IMPORT_FAILED'} → tampil sebagai VDB-W02 di layar.
 //
 // Pola komunikasi: main thread (lib/db.ts) mengirim {id, op, sql?, params?}
 // via postMessage; worker membalas {id, ok:true, ...hasil} atau
@@ -30,12 +33,12 @@
 // untuk operasi export.
 declare const self: DedicatedWorkerGlobalScope;
 
-// TIDAK ADA static import modul di sini — SENGAJA (assignment #23).
-// Static import yang gagal TIDAK BISA di-try/catch: modul tidak pernah
-// dievaluasi sehingga worker mati dengan pesan kosong (VDB-W01 di main
-// thread). Keempat modul di bawah dimuat via DYNAMIC IMPORT di awal initDb()
-// dalam try/catch berlabel fase IMPORT_FAILED, sehingga kegagalan load
-// memunculkan pesan asli sebagai VDB-W02 di layar.
+// ---------------------------------------------------------------------------
+// CATATAN ARSITEKTUR (assignment #23): file ini SENGAJA tanpa static import
+// modul tingkat atas. Semua modul dimuat via dynamic import di FASE
+// IMPORT_FAILED agar kegagalan bundling/transform Vite tertangkap dengan
+// pesan asli — bukan crash bisu di fase evaluasi modul.
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Tipe minimal API sqlite-wasm yang dipakai (salinan dari lib/db.ts agar
@@ -61,11 +64,9 @@ interface Sqlite3Api {
   installOpfsSAHPoolVfs: (opts?: Record<string, unknown>) => Promise<PoolUtil>;
 }
 
-// Tipe fungsi init modul sqlite-wasm. Tipe publik paket sengaja tidak
-// mencantumkan parameter init, padahal runtime-nya menerima opsi Emscripten
-// standar (termasuk locateFile). Fungsi aktual dibangun di dalam initDb()
-// SETELAH dynamic import (lihat FASE 0).
-type PemuatanSqlite3 = (
+// Tipe publik paket sengaja tidak mencantumkan parameter init, padahal
+// runtime-nya menerima opsi Emscripten standar (termasuk locateFile).
+type MuatSqlite3 = (
   opsi?: { locateFile?: (nama: string) => string }
 ) => Promise<Sqlite3Api>;
 
@@ -76,11 +77,24 @@ let pool: PoolUtil | null = null;
 let db: DbWasm | null = null;
 
 // ---------------------------------------------------------------------------
+// Modul yang dimuat di FASE IMPORT_FAILED (dynamic import). Variabel ini
+// HANYA diisi initDb() sebelum dipakai fase-fase berikutnya — jangan dibaca
+// sebelum init selesai.
+// ---------------------------------------------------------------------------
+
+/** Factory init sqlite-wasm (default export '@sqlite.org/sqlite-wasm'). */
+let muatSqlite3: MuatSqlite3 | null = null;
+/** URL file sqlite3.wasm setelah di-bundle Vite (pola ?url = aset statis). */
+let urlWasm = '';
+/** Isi mentah file migrasi SQL (pola ?raw = teks mentah Vite). */
+let teksMigrasi001 = '';
+let teksMigrasi002 = '';
+
+// ---------------------------------------------------------------------------
 // Diagnostik: tangkap error runtime yang lolos dari handler pesan.
-// Sejak assignment #23 tidak ada lagi static import modul — kegagalan load
-// modul dilaporkan via fase IMPORT_FAILED di initDb() (bukan lewat sini).
-// Sisa kasus VDB-W01 (worker.onerror main thread, pesan kosong) berarti
-// worker gagal BAHKAN SEBELUM dynamic import pertama sempat dievaluasi.
+// (Sejak assignment #23 file ini tanpa static import — kegagalan load modul
+// ditangkap FASE IMPORT_FAILED dengan pesan asli. VDB-W01 di main thread
+// kini hanya untuk kasus worker gagal di-spawn/di-load Vite itu sendiri.)
 // ---------------------------------------------------------------------------
 
 self.onerror = (ev: Event) => {
@@ -173,40 +187,50 @@ async function pastikanOpfsBisaDitulis(): Promise<void> {
   }
 }
 
-/** Inisialisasi engine: import dinamis → WASM → guard OPFS → VFS → buka DB → migrasi. Idempoten. */
+/**
+ * Inisialisasi engine: import modul → WASM → guard OPFS → VFS → buka DB →
+ * migrasi. Idempoten (aman dipanggil ulang; berhenti di `if (db) return;`).
+ */
 async function initDb(): Promise<void> {
   if (db) return;
 
-  // FASE 0 — muat keempat modul via DYNAMIC IMPORT (assignment #23).
-  // Static import yang gagal = modul tidak dievaluasi = worker mati dengan
-  // pesan kosong (VDB-W01). Dynamic import di dalam try/catch mengubahnya
-  // menjadi [IMPORT_FAILED] + pesan asli → VDB-W02 di main thread.
-  let urlWasm: string;
-  let migrasi001: string;
-  let migrasi002: string;
-  let muatSqlite3: PemuatanSqlite3;
+  // FASE 0 — IMPORT_FAILED: muat semua modul via dynamic import.
+  // Alasan: static import TIDAK BISA di-try/catch. Bila Vite gagal
+  // mentransform salah satu modul (kasus [VDB-W01] pesan kosong + file
+  // tidak diketahui di laptop Rama), worker crash bisu di fase evaluasi
+  // modul — sebelum baris kode apa pun jalan. Dynamic import memindahkan
+  // kegagalan itu ke dalam try/catch ini sehingga error ASLI tertangkap.
+  // Catatan: literal string di bawah SENGAJA statis — Vite hanya memproses
+  // dynamic import yang bisa dianalisis statis; jangan diganti template
+  // string/variabel.
+  let modulGagal = '@sqlite.org/sqlite-wasm';
   try {
-    const pakSqlite = await import('@sqlite.org/sqlite-wasm');
-    const modWasmUrl = await import('@sqlite.org/sqlite-wasm/sqlite3.wasm?url');
-    const modMig1 = await import('../../migrasi/001_awal.sql?raw');
-    const modMig2 = await import('../../migrasi/002_audit_keamanan.sql?raw');
-    const sqlite3InitModule = pakSqlite.default;
-    // URL file sqlite3.wasm setelah di-bundle Vite (exports "./sqlite3.wasm"
-    // di package.json @sqlite.org/sqlite-wasm; pola ?url = aset statis Vite).
-    urlWasm = modWasmUrl.default as string;
-    migrasi001 = modMig1.default as string;
-    migrasi002 = modMig2.default as string;
-    muatSqlite3 = sqlite3InitModule as unknown as PemuatanSqlite3;
+    const m1 = await import('@sqlite.org/sqlite-wasm');
+    modulGagal = '@sqlite.org/sqlite-wasm/sqlite3.wasm?url';
+    const m2 = await import('@sqlite.org/sqlite-wasm/sqlite3.wasm?url');
+    modulGagal = 'migrasi/001_awal.sql';
+    const m3 = await import('../../migrasi/001_awal.sql?raw');
+    modulGagal = 'migrasi/002_audit_keamanan.sql';
+    const m4 = await import('../../migrasi/002_audit_keamanan.sql?raw');
+    // Ambil default export tiap modul (pola Vite: ?url/?raw → string).
+    muatSqlite3 = m1.default as unknown as MuatSqlite3;
+    urlWasm = m2.default;
+    teksMigrasi001 = m3.default;
+    teksMigrasi002 = m4.default;
   } catch (e) {
-    throw galatFase('IMPORT_FAILED', e);
+    const sebab = e instanceof Error ? e.message : String(e);
+    const rincian = 'import "' + modulGagal + '" gagal: ' + sebab;
+    // Laporkan sebagai diagnostik fatal (main thread menampilkannya sebagai
+    // VDB-W02), lalu lempar agar alur init berhenti dan pemanggil 'init'
+    // ikut menerima kegagalan.
+    self.postMessage({
+      id: -1,
+      ok: false,
+      fase: 'IMPORT_FAILED',
+      error: '[IMPORT_FAILED] ' + rincian,
+    });
+    throw galatFase('IMPORT_FAILED', rincian);
   }
-
-  // Daftar migrasi dibangun dari string hasil dynamic import di atas.
-  // Skema DB TIDAK berubah dari edisi Tauri (keputusan pivot).
-  const daftarMigrasi: Array<[versi: string, sql: string]> = [
-    ['001_awal', migrasi001],
-    ['002_audit_keamanan', migrasi002],
-  ];
 
   // FASE 1 — muat engine SQLite (WASM).
   let sqlite3: Sqlite3Api;
@@ -214,7 +238,11 @@ async function initDb(): Promise<void> {
     if (!urlWasm) {
       throw new Error('URL sqlite3.wasm kosong — bundler tidak menyertakan file WASM (cek pola ?url).');
     }
-    sqlite3 = await muatSqlite3({
+    const muat = muatSqlite3;
+    if (!muat) {
+      throw new Error('Modul sqlite-wasm belum dimuat — FASE IMPORT_FAILED tidak selesai.');
+    }
+    sqlite3 = await muat({
       locateFile: (nama) => (nama === 'sqlite3.wasm' ? urlWasm : nama),
     });
   } catch (e) {
@@ -255,7 +283,7 @@ async function initDb(): Promise<void> {
   try {
     const koneksi = db;
     if (!koneksi) throw new Error('Koneksi null sebelum migrasi.');
-    jalankanMigrasi(koneksi, daftarMigrasi);
+    jalankanMigrasi(koneksi);
   } catch (e) {
     throw galatFase('MIGRATION_FAILED', e);
   }
@@ -280,7 +308,13 @@ function normalisasiParam(sql: string): string {
 // Migrasi skema — skema DB TIDAK berubah dari edisi Tauri (keputusan pivot).
 // ---------------------------------------------------------------------------
 
-function jalankanMigrasi(database: DbWasm, daftar: Array<[versi: string, sql: string]>): void {
+function jalankanMigrasi(database: DbWasm): void {
+  // Daftar migrasi dibangun DI SINI (bukan const tingkat atas) karena isi
+  // SQL baru tersedia setelah FASE IMPORT_FAILED selesai.
+  const daftarMigrasi: Array<[versi: string, sql: string]> = [
+    ['001_awal', teksMigrasi001],
+    ['002_audit_keamanan', teksMigrasi002],
+  ];
   database.exec(
     `CREATE TABLE IF NOT EXISTS migrasi (
        versi TEXT PRIMARY KEY,
@@ -289,7 +323,7 @@ function jalankanMigrasi(database: DbWasm, daftar: Array<[versi: string, sql: st
   );
   const sudah = database.selectObjects('SELECT versi FROM migrasi') as Array<{ versi: string }>;
   const terapkan = new Set(sudah.map((r) => r.versi));
-  for (const [versi, sql] of daftar) {
+  for (const [versi, sql] of daftarMigrasi) {
     if (terapkan.has(versi)) continue;
     // db.exec menerima SQL multi-statement sekaligus (migrasi = DDL + seed).
     database.exec(sql);
