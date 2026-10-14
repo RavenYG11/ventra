@@ -15,7 +15,7 @@
 | Aspek | Hasil |
 |---|---|
 | **VERDICT** | **LULUS** — push ke `main` **DIIZINKAN** |
-| Test KRITIS | **19/19 LULUS** |
+| Test KRITIS | **18/18 LULUS** |
 | Test SEDANG | 12/12 LULUS (1 observasi UX, bukan kegagalan) |
 | Test RENDAH | 5/5 LULUS |
 | Temuan KRITIS | **0** |
@@ -146,7 +146,7 @@ Rekomendasi: tolak/hapus pemisah ribuan eksplisit (mis. strip `.` bila diikuti t
 
 ## 6. Verdict
 
-**LULUS.** Seluruh 19 test KRITIS lolos dengan bukti eksekusi (bukan sekadar baca kode):
+**LULUS.** Seluruh 18 test KRITIS lolos dengan bukti eksekusi (bukan sekadar baca kode):
 `tsc` bersih, `vite build` sukses, 20 uji SQL aktual lolos, 32 uji validasi/parse lolos,
 perhitungan cocok dengan oracle independen, audit import/export bersih, XSS tertutup di level kode.
 
