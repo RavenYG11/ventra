@@ -1,0 +1,164 @@
+/* Ventra — tema Template B: gelap, operasional, kontras tinggi.
+   Token dari specs/desain-template-b.md (Prapto). */
+
+:root {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --panel2: #1c222b;
+  --ink: #f2f5f9;
+  --muted: #9aa4b2;
+  --line: #2a323d;
+  --amber: #ffb020;
+  --green: #22c55e;
+  --green-d: #15803d;
+  --red: #ef4444;
+  --red-d: #b91c1c;
+  --blue: #38bdf8;
+  --input-bg: #0b0e13;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+/* ---------- Topbar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: #000;
+  border-bottom: 3px solid var(--amber);
+  padding: 10px 20px;
+  display: flex; align-items: center; gap: 20px;
+}
+.brand { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+.brand small { display: block; font-size: 10px; color: var(--muted); letter-spacing: 2px; font-weight: 400; }
+.tabs { display: flex; gap: 8px; margin: 0 auto; }
+.tab {
+  padding: 12px 26px; border: 2px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--ink);
+  font-size: 15px; font-weight: 800; letter-spacing: .5px; cursor: pointer;
+}
+.tab.aktif { background: var(--amber); color: #000; border-color: var(--amber); }
+.akun { font-size: 12px; color: var(--muted); }
+.link-keluar { color: var(--amber); font-weight: 800; cursor: pointer; text-decoration: underline; }
+
+/* ---------- Layout ---------- */
+.layar { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.judul-layar { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; margin: 0 0 16px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px; }
+
+/* ---------- Form ---------- */
+.label-form {
+  display: block; font-size: 12px; font-weight: 800;
+  letter-spacing: .6px; text-transform: uppercase; color: var(--amber);
+  margin: 14px 0 6px;
+}
+.input, .select, .textarea {
+  width: 100%; padding: 13px; font-size: 16px; color: var(--ink);
+  background: var(--input-bg); border: 2px solid var(--line); border-radius: 6px;
+}
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--amber); }
+.textarea { min-height: 60px; resize: vertical; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.kode-mono { font-family: Consolas, monospace; font-size: 13px; color: var(--blue); }
+
+/* ---------- Tombol ---------- */
+.tombol {
+  border: none; border-radius: 6px; cursor: pointer;
+  font-weight: 900; text-transform: uppercase; letter-spacing: .5px;
+  padding: 13px 22px; font-size: 15px;
+}
+.tombol:active { transform: scale(.98); }
+.tombol-utama { background: var(--amber); color: #000; }
+.tombol-masuk { background: var(--green); color: #04140a; }
+.tombol-keluar2 { background: var(--red); color: #fff; }
+.tombol-outline { background: transparent; border: 2px solid var(--line); color: var(--ink); }
+.tombol-ghost { background: transparent; color: var(--muted); }
+.tombol-blok { width: 100%; }
+.tombol-besar { font-size: 19px; padding: 20px; }
+.bar-aksi { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.bar-bawah { display: flex; gap: 12px; margin-top: 18px; }
+.bar-bawah .tombol { flex: 1; }
+
+/* ---------- Tabel ---------- */
+.tabel-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.grid th {
+  background: #000; color: var(--amber); font-size: 11.5px; text-transform: uppercase;
+  letter-spacing: .5px; text-align: left; padding: 10px;
+  border-bottom: 2px solid var(--amber); white-space: nowrap;
+}
+table.grid td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.grid tr.menipis td { background: #2a1215; }
+table.grid tr.menipis td:first-child { border-left: 5px solid var(--red); }
+td.angka, th.angka { text-align: right; font-variant-numeric: tabular-nums; }
+td.tebal { font-weight: 800; font-size: 17px; }
+td.nowrap { white-space: nowrap; }
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-block; padding: 5px 14px; border-radius: 4px;
+  font-size: 12px; font-weight: 900; letter-spacing: .5px;
+  text-transform: uppercase; white-space: nowrap;
+}
+.badge-aman { background: #052e16; color: var(--green); border: 1px solid var(--green-d); }
+.badge-menipis { background: var(--red); color: #fff; animation: kedip 1.2s infinite; }
+.badge-habis { background: #000; color: var(--red); border: 1px solid var(--red-d); }
+@keyframes kedip { 50% { opacity: .55; } }
+
+/* ---------- Kartu statistik ---------- */
+.grid-stat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 4px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-left: 6px solid var(--blue); border-radius: 8px; padding: 14px 16px; }
+.stat.waspada { border-left-color: var(--red); }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.stat .nilai { font-size: 28px; font-weight: 900; margin-top: 4px; }
+.stat .nilai.bad { color: var(--red); }
+.stat .nilai.biru { color: var(--blue); }
+
+/* ---------- Toolbar ---------- */
+.toolbar { display: flex; gap: 12px; align-items: center; margin: 16px 0; }
+.toolbar .input { max-width: 380px; }
+
+/* ---------- Login ---------- */
+.login-wrap { max-width: 460px; margin: 44px auto 0; }
+.login-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px; }
+.logo { font-size: 34px; font-weight: 900; letter-spacing: 1px; text-align: center; margin-bottom: 12px; }
+.box-info {
+  background: #231a05; border: 2px solid var(--amber); border-radius: 6px;
+  color: #ffd98a; padding: 12px; font-size: 13px; margin-bottom: 8px;
+}
+.link-lupa { display: block; text-align: center; margin-top: 14px; color: var(--amber); cursor: pointer; text-decoration: underline; font-size: 14px; }
+.hint-bawah { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; }
+.pesan-galat {
+  background: var(--red); color: #fff; border-radius: 6px;
+  padding: 16px; font-size: 15px; font-weight: 800; margin: 12px 0;
+}
+.pesan-sukses {
+  background: #052e16; color: var(--green); border: 1px solid var(--green-d);
+  border-radius: 6px; padding: 16px; font-size: 15px; font-weight: 800; margin: 12px 0;
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px;
+}
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+.modal h3 { margin: 0 0 8px; font-size: 18px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--amber); color: #000; font-weight: 900; text-transform: uppercase;
+  padding: 14px 26px; border-radius: 6px; max-width: 92%;
+  animation: toast-masuk .25s ease-out; z-index: 60;
+}
+@keyframes toast-masuk { from { opacity: 0; transform: translate(-50%, 12px); } }
+
+.kosong { text-align: center; color: var(--muted); padding: 40px 0; }
