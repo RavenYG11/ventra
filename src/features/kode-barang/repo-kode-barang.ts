@@ -185,3 +185,28 @@ export async function petaKodePerKategori(): Promise<Record<number, KodeBarang[]
   }
   return peta;
 }
+
+/** Aktifkan kembali kode barang yang dinonaktifkan (QA KB-10, Q4-04). */
+export async function aktifkanKodeBarang(id: number): Promise<void> {
+  const db = await dapatkanDb();
+  await db.execute('UPDATE kode_barang SET aktif = 1 WHERE id = $1', [id]);
+}
+
+/**
+ * Jumlah mapping ke kode AKTIF milik kategori, KECUALI satu pasangan.
+ * Untuk validasi Q4 saat melepas: penolakan hanya bila pelepasan ini
+ * membuat kategori kehabisan kode aktif (sisa = 0).
+ */
+export async function hitungMappingAktifKecuali(
+  kategoriId: number,
+  kecualiKodeBarangId: number
+): Promise<number> {
+  const db = await dapatkanDb();
+  const baris = await db.select<Array<{ jml: number }>>(
+    `SELECT COUNT(*) AS jml FROM kategori_kode_barang m
+     JOIN kode_barang kb ON kb.id = m.kode_barang_id
+     WHERE m.kategori_id = $1 AND kb.aktif = 1 AND m.kode_barang_id <> $2`,
+    [kategoriId, kecualiKodeBarangId]
+  );
+  return baris[0].jml;
+}

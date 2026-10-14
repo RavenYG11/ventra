@@ -1,5 +1,45 @@
 # Progress Build — Ventra v0.1
 
+## [2026-10-14] v0.1 — Fitur Kode Barang: menu Product Management + migrasi 003 (assignment #28)
+- Selesai (keputusan final Rama Q1–Q4):
+  - Migrasi `003_kode_barang.sql`: tabel `kode_barang` (pola + counter sendiri) +
+    `kategori_kode_barang` (mapping **M:N fleksibel penuh**, tanpa UNIQUE —
+    keputusan Q2); backfill 1:1 dari kategori lama; `barang.kode_barang_id`
+    via join kategori (aman walau prefix pernah berubah); kolom `prefix_kode` /
+    `nomor_urut_terakhir` dihapus dari `kategori` via rebuild tabel (DROP COLUMN
+    ditolak SQLite untuk kolom UNIQUE); view `v_barang` + kolom
+    `kode_barang_kode`. Seluruh migrasi dalam **satu transaksi** (QA MIG-07).
+  - Menu baru **Product Management** (Q1): 3 tab — Kategori (form nama saja),
+    Kode Barang (CRUD pola, counter read-only, kode dikunci bila sudah dipakai),
+    Mapping (hubung/lepas; lepas mapping aktif terakhir DITOLAK — Q4).
+  - Form Tambah Barang baru: pilih kategori → pilih kode barang (terfilter
+    mapping) → preview kode berikutnya; auto-fill + catatan bila tepat 1 kode
+    (Q3); kategori tanpa kode -> pesan merah + tombol Simpan nonaktif (Q4).
+  - `src/pages/KelolaKategori.tsx` dihapus (digantikan menu ini).
+  - **TEMUAN KRITIS — bug lama diperbaiki:** pola `WITH x AS (UPDATE ...
+    RETURNING ...)` di `tambahBarangAtomik` ternyata TIDAK didukung SQLite
+    (syntax error) — fitur tambah barang tidak pernah bisa jalan sejak awal.
+    Diganti `UPDATE ... RETURNING` langsung + INSERT terpisah (tetap aman dari
+    nomor ganda: satu koneksi + satu tab + satu pengguna).
+  - Perbaikan hasil review (Gunet, pasca-push): tambah export
+    `petaKodePerKategori` yang hilang (tsc gagal compile — blokir build);
+    validasi kode STRICT tolak huruf kecil (QA KB-02); tombol Aktifkan kembali
+    untuk kategori & kode barang (QA KB-10/Q4-04); badge "⚠ TANPA KODE" +
+    banner peringatan (QA Q4-01/02); catatan auto-fill/pilih manual (QA
+    FORM-02/03); mapping nonaktif boleh dilepas; service-barang lewat
+    service-kode-barang (aturan lapisan).
+  - Docs ikut update (aturan realtime): `docs/model-data.md` (§2/§2a/§2b/§3),
+    `docs/desain-kode-barang.md` (FINAL + 4 keputusan), `docs/QA-CHECKLIST.md`,
+    `docs/qa-kode-barang.md` (test plan Testarossa, 59 kasus), README.
+- Test: simulasi migrasi 003 + pola UPDATE...RETURNING di SQLite (lolos);
+  review silang ke mockup Prapto + QA test plan. BELUM compile
+  (`npm run build`) — tidak ada toolchain di VM ini; wajib di laptop Rama.
+- Kendala / catatan jujur:
+  1. `npm install` → `npm run dev` → `git pull` wajib di laptop Rama untuk
+     verifikasi (migrasi 003 jalan otomatis sekali saat boot).
+  2. Database dev (`localhost:5173`) dan XAMPP (`localhost/ventra`) terpisah.
+- Berikutnya: eksekusi QA Testarossa (assignment #30) → verifikasi Rama.
+
 ## [2026-10-14] v0.1 — PIVOT WEB: hapus Tauri, SQLite via WASM + OPFS (assignment #18)
 - Selesai (keputusan Rama: tanpa install Rust — Tauri/desktop DIBATALKAN):
   - `src-tauri/` dihapus total dari repo (5 file: `src/main.rs`, `tauri.conf.json`,

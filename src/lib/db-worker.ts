@@ -331,7 +331,19 @@ function jalankanMigrasi(database: DbWasm): void {
   for (const [versi, sql] of daftarMigrasi) {
     if (terapkan.has(versi)) continue;
     // db.exec menerima SQL multi-statement sekaligus (migrasi = DDL + seed).
-    database.exec(sql);
+    try {
+      database.exec(sql);
+    } catch (e) {
+      // Migrasi 003 berjalan dalam BEGIN IMMEDIATE...COMMIT (atomik, QA MIG-07).
+      // Bila gagal di tengah: ROLLBACK agar tidak ada perubahan setengah jalan
+      // DAN baris versi tidak tercatat — retry berikutnya mulai bersih.
+      try {
+        database.exec('ROLLBACK;');
+      } catch {
+        // Abaikan — tidak ada transaksi terbuka (migrasi tanpa BEGIN).
+      }
+      throw e;
+    }
     database.exec({ sql: 'INSERT INTO migrasi (versi) VALUES (?)', bind: [versi] });
   }
 }

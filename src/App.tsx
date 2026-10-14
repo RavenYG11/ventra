@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import LoginPage from './pages/LoginPage';
 import BarangPage from './pages/BarangPage';
-import ProductManagementPage from './pages/ProductManagementPage';
+import ProductManagementPage from './pages/produk-manajemen/ProductManagementPage';
 import { keluar, sesiAktif } from './features/pengguna/service-login';
 
 type TabAktif = 'barang' | 'pm';

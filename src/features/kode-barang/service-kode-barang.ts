@@ -3,17 +3,21 @@
 //   Q1: menu 'Product Management'. Q2: M:N fleksibel penuh.
 //   Q3: dropdown auto-fill bila kategori hanya punya 1 kode. Q4: kategori wajib
 //   punya minimal 1 kode barang aktif.
+// Acuan validasi mengikat: docs/mockup-product-management.html (Prapto)
+// dan docs/qa-kode-barang.md (Testarossa).
 import type { Hasil, KodeBarang } from '../../types';
 import {
+  aktifkanKodeBarang as aktifkanKodeBarangRepo,
   daftarKodeBarang,
   daftarKodeBarangRingkasan,
   daftarKodeUntukKategori,
-  hitungMappingAktif,
+  hitungMappingAktifKecuali,
   hitungSemuaBarangDiKodeBarang,
   hubungkanMapping,
   infoMapping,
   lepasMapping,
   nonaktifkanKodeBarang,
+  petaKodePerKategori,
   pratinjauKodeBerikutnya,
   tambahKodeBarang,
   ubahKodeBarang,
@@ -23,12 +27,17 @@ import {
 } from './repo-kode-barang';
 
 export type { InfoMapping, KodeBarangRingkasan };
+export { petaKodePerKategori };
 
 const POLA_KODE = /^[A-Z0-9-]{1,10}$/;
 
+/**
+ * Validasi kode — STRICT seperti mockup (layar D "State Kosong & Validasi"):
+ * huruf kecil DITOLAK (tidak di-uppercase diam-diam), pesan persis mockup.
+ */
 function validasiKode(kode: string): string | null {
-  if (!POLA_KODE.test(kode.trim().toUpperCase())) {
-    return 'Kode 1–10 karakter: huruf kapital, angka, strip (tanpa spasi).';
+  if (!POLA_KODE.test(kode.trim())) {
+    return 'Kode harus huruf kapital, pola [A-Z0-9-], 1–10 karakter, tanpa spasi.';
   }
   return null;
 }
@@ -109,6 +118,12 @@ export async function hapusKodeBarang(id: number): Promise<Hasil<void>> {
   return { ok: true };
 }
 
+/** Aktifkan kembali kode barang yang dinonaktifkan (QA KB-10, Q4-04). */
+export async function aktifkanKodeBarang(id: number): Promise<Hasil<void>> {
+  await aktifkanKodeBarangRepo(id);
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Mapping.
 // ---------------------------------------------------------------------------
@@ -126,13 +141,13 @@ export async function hubungkanKode(
 }
 
 /**
- * Lepas mapping — DITOLAK bila ini mapping aktif terakhir milik kategori (Q4).
- * Kategori wajib punya minimal 1 kode barang aktif agar selalu bisa dipakai
- * membuat barang baru.
+ * Lepas mapping — DITOLAK hanya bila pelepasan ini membuat kategori
+ * kehabisan kode barang AKTIF (Q4). Melepas mapping ke kode yang sudah
+ * nonaktif SELALU boleh (tidak mengurangi hitungan kode aktif).
  */
 export async function lepasKode(kategoriId: number, kodeBarangId: number): Promise<Hasil<void>> {
-  const jml = await hitungMappingAktif(kategoriId);
-  if (jml <= 1) {
+  const sisaAktif = await hitungMappingAktifKecuali(kategoriId, kodeBarangId);
+  if (sisaAktif === 0) {
     return {
       ok: false,
       galat:

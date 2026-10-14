@@ -3,6 +3,7 @@
 // (prefix & counter pindah ke entitas kode_barang).
 import type { Hasil, Kategori } from '../../types';
 import {
+  aktifkanKategori as aktifkanKategoriRepo,
   daftarKategori,
   daftarKategoriRingkasan,
   hitungBarangDiKategori,
@@ -66,5 +67,15 @@ export async function hapusKategori(id: number): Promise<Hasil<void>> {
     };
   }
   await nonaktifkanKategori(id);
+  return { ok: true };
+}
+
+/**
+ * Aktifkan kembali kategori yang dinonaktifkan.
+ * Kategori aktif yang belum punya kode barang aktif otomatis ter-flag
+ * "⚠ TANPA KODE" di tab Kategori (aturan Q4).
+ */
+export async function aktifkanKategori(id: number): Promise<Hasil<void>> {
+  await aktifkanKategoriRepo(id);
   return { ok: true };
 }

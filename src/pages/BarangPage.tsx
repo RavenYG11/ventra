@@ -63,6 +63,7 @@ export default function BarangPage({
   const [form, setForm] = useState<FormBarang>(FORM_KOSONG);
   const [kodeTersedia, setKodeTersedia] = useState<KodeBarang[]>([]);
   const [previewKode, setPreviewKode] = useState<string | null>(null);
+  const [catatanKode, setCatatanKode] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
 
   async function muat() {
@@ -94,11 +95,17 @@ export default function BarangPage({
     setNilai('kategori_id', id);
     setNilai('kode_barang_id', 0);
     setPreviewKode(null);
+    setCatatanKode(null);
     const daftarKode = await daftarKodeAktifUntukKategori(id);
     setKodeTersedia(daftarKode);
     if (daftarKode.length === 1) {
+      // Q3: tepat 1 kode aktif -> terisi otomatis + catatan (QA FORM-02).
       setNilai('kode_barang_id', daftarKode[0].id);
       setPreviewKode(await kodeBerikutnya(daftarKode[0].id));
+      setCatatanKode('✔ Terisi otomatis — kategori ini hanya punya 1 kode barang aktif.');
+    } else if (daftarKode.length > 1) {
+      // QA FORM-03: >1 kode -> pilih manual, tidak ada yang terpilih diam-diam.
+      setCatatanKode(`Pilih manual — kategori ini punya ${daftarKode.length} kode barang aktif.`);
     }
   }
 
@@ -113,6 +120,7 @@ export default function BarangPage({
     setForm({ ...FORM_KOSONG, kategori_id: pertama?.id ?? 0 });
     setKodeTersedia([]);
     setPreviewKode(null);
+    setCatatanKode(null);
     setGalat(null);
     setShowForm(true);
     if (pertama) void pilihKategori(pertama.id);
@@ -312,12 +320,13 @@ export default function BarangPage({
                     onChange={(e) => void pilihKategori(Number(e.target.value))}
                   >
                     {kategori.map((k) => (
-                      <option key={k.id} value={k.id} disabled={k.jml_kode === 0}>
+                      <option key={k.id} value={k.id}>
                         {k.nama}
-                        {k.jml_kode === 0 ? ' (belum punya kode barang)' : ''}
+                        {k.jml_kode === 0 ? ' — ⚠ belum ada kode barang' : ''}
                       </option>
                     ))}
                   </select>
+                  {catatanKode && <div className="teks-baik">{catatanKode}</div>}
                 </div>
                 <div>
                   <LabelForm>Kode Barang</LabelForm>
@@ -337,9 +346,13 @@ export default function BarangPage({
                 </div>
               </div>
               {kategoriTanpaKode ? (
-                <div className="warnbox">
-                  Kategori "{kategoriDipilih?.nama}" belum punya kode barang aktif. Hubungkan minimal 1
-                  kode barang di <b>Product Management → Mapping</b> sebelum kategori ini bisa dipakai.
+                // QA FORM-05: kategori tanpa kode -> pesan MERAH + Simpan nonaktif.
+                <div className="pesan-galat">
+                  DITOLAK: kategori "{kategoriDipilih?.nama}" belum punya kode barang aktif.
+                  <br />
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>
+                    Hubungkan dulu di Product Management → Mapping.
+                  </span>
                 </div>
               ) : (
                 previewKode && (
@@ -400,7 +413,7 @@ export default function BarangPage({
             <Tombol varian="ghost" onClick={() => setShowForm(false)}>
               Batal
             </Tombol>
-            <Tombol varian="utama" disabled={sibuk} onClick={simpan}>
+            <Tombol varian="utama" disabled={sibuk || !!kategoriTanpaKode} onClick={simpan}>
               {sibuk ? 'Menyimpan…' : 'Simpan'}
             </Tombol>
           </div>

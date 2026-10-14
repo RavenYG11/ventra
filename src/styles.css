@@ -163,7 +163,7 @@ td.nowrap { white-space: nowrap; }
 
 .kosong { text-align: center; color: var(--muted); padding: 40px 0; }
 
-/* ---------- Product Management (assignment #26) ---------- */
+/* ---------- Product Management (assignment #28) ---------- */
 /* Sub-tab: Kategori / Kode Barang / Mapping (amber = aktif, mockup Prapto). */
 .subtabs { display: flex; gap: 10px; margin-bottom: 16px; }
 .subtab {
@@ -202,3 +202,14 @@ td.nowrap { white-space: nowrap; }
 .link-kecil { color: var(--amber); cursor: pointer; text-decoration: underline; font-size: 13px; }
 .status-aktif { color: var(--green); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
 .status-nonaktif { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* Badge peringatan Q4: kategori aktif tanpa kode barang aktif. */
+.badge-tanpa-kode {
+  display: inline-block; padding: 5px 14px; border-radius: 4px;
+  font-size: 12px; font-weight: 900; letter-spacing: .5px;
+  text-transform: uppercase; white-space: nowrap;
+  background: var(--amber); color: #000;
+}
+/* Catatan auto-fill Q3 di form Tambah Barang. */
+.teks-baik { color: var(--green); font-size: 13px; font-weight: 700; margin-top: 6px; }
+.teks-galat { color: var(--red); font-size: 13px; font-weight: 700; margin-top: 6px; }

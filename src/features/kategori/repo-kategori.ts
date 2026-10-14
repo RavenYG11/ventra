@@ -57,3 +57,9 @@ export async function hitungBarangDiKategori(id: number): Promise<number> {
   );
   return baris[0].jml;
 }
+
+/** Aktifkan kembali kategori yang dinonaktifkan. */
+export async function aktifkanKategori(id: number): Promise<void> {
+  const db = await dapatkanDb();
+  await db.execute('UPDATE kategori SET aktif = 1 WHERE id = $1', [id]);
+}

@@ -1,9 +1,12 @@
 // Service barang — validasi + aturan bisnis master barang.
 // Sejak migrasi 003_kode_barang: tambah barang wajib memilih KODE BARANG
 // (aktif & ter-mapping ke kategori yang dipilih) — counter menempel di kode.
+//
+// ATURAN LAPISAN (Gunet): service HANYA boleh memakai service lain,
+// tidak langsung ke repo fitur lain.
 import type { Barang, Hasil } from '../../types';
 import { daftarKategori } from '../kategori/repo-kategori';
-import { daftarKodeAktifUntukKategori } from '../kode-barang/repo-kode-barang';
+import { daftarKodeAktifUntukKategori } from '../kode-barang/service-kode-barang';
 import {
   ambilBarang,
   daftarBarang,

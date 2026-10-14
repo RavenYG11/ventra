@@ -1,4 +1,4 @@
--- 003_kode_barang.sql — fitur Kode Barang (assignment #26, 14 Okt 2026).
+-- 003_kode_barang.sql — fitur Kode Barang (assignment #28, 14 Okt 2026).
 -- Keputusan final Rama:
 --   Q1: menu baru bernama "Product Management".
 --   Q2: relasi kategori <-> kode barang M:N FLEKSIBEL PENUH
@@ -7,6 +7,13 @@
 --   Q4: kategori wajib punya minimal 1 kode barang aktif.
 -- Berjalan otomatis sekali saat aplikasi dibuka setelah update (pola migrasi
 -- yang sama seperti 001/002 di src/lib/db-worker.ts).
+--
+-- ATOMIK (QA MIG-07): seluruh skrip dalam SATU transaksi — gagal di tengah =
+-- batal total, database kembali seperti semula. Bila exec melempar, worker
+-- (db-worker.ts) melakukan ROLLBACK sebelum mencatat versi, sehingga retry
+-- berikutnya mulai dari kondisi bersih. Backfill memakai INSERT OR IGNORE
+-- (idempoten) sebagai pengaman lapis kedua.
+BEGIN IMMEDIATE;
 
 -- 1. Entitas kode barang: satu baris = satu pola kode (prefix + counter sendiri).
 CREATE TABLE IF NOT EXISTS kode_barang (
@@ -34,7 +41,8 @@ CREATE TABLE IF NOT EXISTS kategori_kode_barang (
 
 -- 3. Backfill: tiap kategori -> 1 kode_barang (relasi 1:1 pada saat migrasi).
 --    substr(...,1,50) menjaga CHECK length(nama) bila nama kategori 50 char.
-INSERT INTO kode_barang (kode, nama, nomor_urut_terakhir, aktif)
+--    OR IGNORE: idempoten bila migrasi dijalankan ulang setelah gagal.
+INSERT OR IGNORE INTO kode_barang (kode, nama, nomor_urut_terakhir, aktif)
 SELECT prefix_kode,
        substr('Kode ' || nama, 1, 50),
        nomor_urut_terakhir,
@@ -42,7 +50,7 @@ SELECT prefix_kode,
 FROM kategori;
 
 -- 4. Backfill mapping 1:1 awal (setiap kategori <-> kode_barang hasil konversinya).
-INSERT INTO kategori_kode_barang (kategori_id, kode_barang_id)
+INSERT OR IGNORE INTO kategori_kode_barang (kategori_id, kode_barang_id)
 SELECT k.id, kb.id
 FROM kategori k JOIN kode_barang kb ON kb.kode = k.prefix_kode;
 
@@ -93,3 +101,5 @@ SELECT
 FROM barang b
 JOIN kategori k ON k.id = b.kategori_id
 LEFT JOIN kode_barang kb ON kb.id = b.kode_barang_id;
+
+COMMIT;
