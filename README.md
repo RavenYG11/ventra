@@ -124,46 +124,27 @@ Ventra hanya memakai VFS `opfs-sahpool`, yang tidak terpengaruh.
 2. Buka DevTools → tab **Console** → salin teks merah (`Uncaught ...`) bila ada.
 3. Jangan buka Ventra di dua tab bersamaan (satu file database = satu koneksi).
 
-## Troubleshooting: layar putih kosong (blank white page)
+## Troubleshooting layar putih kosong (blank white page)
 
-**Gejala (14 Okt 2026 ~20:39 WIB):** setelah `git pull` + `npm install` +
-`npm run dev`, browser menampilkan halaman **putih kosong total** — tidak ada UI
-sama sekali, padahal aplikasi sempat berjalan normal sebelum pull (commit
-`0bc36f8`).
+**Gejala:** setelah `git pull`, browser menampilkan halaman putih total — tidak ada
+UI sama sekali, tanpa layar galat database.
 
-**Penyebab (TERBUKTI dari audit source, bukan tebakan):** dua *named import* tidak
-memiliki pasangan *export* di commit `7b33567` (push kode fitur Kode Barang).
-`npm run dev` (Vite) **tidak** menjalankan `tsc`, sehingga galat ini lolos
-diam-diam ke browser. Saat modul dievaluasi, browser melempar:
+**Penyebab umum:** modul JavaScript gagal dimuat — biasanya karena ada `import`
+yang menunjuk ke nama export yang tidak ada (contoh nyata, 14 Okt 2026:
+`ProductManagementPage.tsx` mengimpor `petaKodePerKategori` dari
+`service-kode-barang`, padahal export tersebut belum dibuat → ESM link error →
+seluruh aplikasi gagal load). Berbeda dengan galat database (yang menampilkan
+layar `VDB-`), kasus ini terjadi sebelum React sempat render apa pun.
 
-`SyntaxError: The requested module '...' does not provide an export named '...'`
+**Diagnosis:**
+1. Buka DevTools → tab **Console** → cari baris merah `Uncaught SyntaxError:
+   The requested module '...' does not provide an export named '...'`.
+   Nama modul + nama export yang hilang langsung menunjuk ke file penyebab.
+2. `npx tsc --noEmit` di repo — TypeScript menangkap kasus ini saat compile
+   (Vite dev tidak melakukan typecheck, jadi lolos tanpa peringatan).
 
-seluruh module graph gagal dievaluasi → React tidak pernah mount → putih kosong.
-
-| # | File pengimpor | Nama yang diimpor | Masalah di `7b33567` |
-|---|---|---|---|
-| 1 | `src/pages/ProductManagementPage.tsx` | `petaKodePerKategori` | belum diekspor oleh `src/features/kode-barang/service-kode-barang.ts` |
-| 2 | `src/features/barang/service-barang.ts` | `daftarKodeAktifUntukKategori` | diimpor langsung dari `repo-kode-barang.ts` (salah lapisan — aturan: service lewat service), tidak ada di sana |
-
-**Fix:** sudah masuk di commit `b8c58a0` (assignment #28, perbaikan hasil review
-Gunet): (1) tambah `export { petaKodePerKategori }` di `service-kode-barang.ts`;
-(2) `service-barang.ts` kini mengimpor `daftarKodeAktifUntukKategori` dari
-`service-kode-barang.ts` (lapisan service, bukan repo langsung). **Tindakan Rama:
-cukup `git pull` lagi** (mengambil `b8c58a0` + `81ef104`) lalu restart
-`npm run dev` — tidak ada yang perlu diubah di laptop.
-
-**Bukan penyebab:** penghapusan `src/pages/KelolaKategori.tsx` (`f5c60a4`)
-terbukti aman — audit `git grep` di seluruh `src/` menunjukkan tidak ada satu pun
-file yang mengimpornya (file mati). Audit yang sama memastikan tidak ada lagi
-import ke file yang sudah dihapus di HEAD.
-
-**Pelajaran / pencegahan:**
-- `npm run dev` tidak typecheck — sebelum push kode, jalankan `npm run build`
-  (ada `tsc`) untuk menangkap *named import* tanpa pasangan export sebelum sampai
-  ke browser Rama.
-- Refactor pecah-file (batas ±500 baris/file) + re-export yang lupa adalah
-  pasangan klasik penyebab white page; setiap selesai refactor, audit ulang
-  pasangan import/export.
+**Perbaikan:** tambahkan export yang hilang di modul sumber (atau perbaiki nama
+import), lalu `git pull` ulang di laptop.
 
 ## Verifikasi sebelum dinyatakan selesai
 
