@@ -13,6 +13,7 @@ import { hitungRingkasan } from './ringkasan';
 import type { PenyimpananBarang } from './db/kontrak';
 import { GALAT_STOK_KURANG } from './db/kontrak';
 import { bukaPenyimpanan } from './db/buka';
+import { hapusSemuaDataLokal } from './db/lokal';
 import { Ringkasan } from './ui/Ringkasan';
 import { FormBarang } from './ui/FormBarang';
 import { DaftarBarang } from './ui/DaftarBarang';
@@ -104,6 +105,22 @@ export function App() {
               ⟲ Muat Ulang
             </button>
           </div>
+          {galatBoot.includes('DATA_RUSAK') && (
+            <div className="actions" style={{ marginTop: '12px' }}>
+              <button
+                type="button"
+                className="btn red grow"
+                onClick={() => {
+                  if (window.confirm('Hapus seluruh data lokal yang rusak dan mulai dari kosong?')) {
+                    hapusSemuaDataLokal();
+                    window.location.reload();
+                  }
+                }}
+              >
+                🗑 Hapus Data Rusak &amp; Mulai Kosong
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
