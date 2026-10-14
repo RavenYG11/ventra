@@ -136,9 +136,20 @@ function resetWorker(): void {
 
 function dapatkanWorker(): Worker {
   if (!worker) {
-    // Pola resmi Vite: literal statis new URL('./db-worker.ts', import.meta.url).
-    // Jangan diganti string dinamis — bundler tidak akan memprosesnya.
-    worker = new Worker(new URL('./db-worker.ts', import.meta.url), { type: 'module' });
+    // Pola resmi Vite: literal statis new URL('...', import.meta.url).
+    // Jangan diganti string dinamis atau variabel — bundler tidak akan
+    // memprosesnya (db-worker.ts tidak ikut ter-bundle → 404 di production).
+    // Query opfs-disable & opfs-wl-disable (assignment #24, 2026-10-14):
+    // sqlite3InitModule() otomatis mencoba install VFS async 'opfs'/'opfs-wl'
+    // via nested Worker("sqlite3-opfs-async-proxy.js?vfs=...") yang gagal
+    // di-resolve Vite dev → warning harmless "Ignoring inability to install".
+    // Mekanisme resmi: opfsUtil.initOptions() membaca query params dari
+    // location.href DI DALAM worker. Ventra hanya memakai 'opfs-sahpool'
+    // (installOpfsSAHPoolVfs tidak membaca URL params), jadi aman dimatikan.
+    worker = new Worker(
+      new URL('./db-worker.ts?opfs-disable&opfs-wl-disable', import.meta.url),
+      { type: 'module' },
+    );
     worker.onmessage = (ev: MessageEvent<BalasanWorker>) => {
       const m = ev.data;
       if (!m || typeof m.id !== 'number') return;

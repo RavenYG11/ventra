@@ -106,6 +106,13 @@ kembali ke `db.ts`. File `db.ts` hanyalah proxy via `postMessage`.
 | `[DB_OPEN_FAILED]` | File database terkunci (kemungkinan dua tab) | Tutup semua tab Ventra, buka satu tab baru |
 | `[MIGRATION_FAILED]` | Migrasi skema gagal | Lihat detail teknis; jangan hapus data manual |
 
+**Catatan:** warning console `Ignoring inability to install 'opfs'/'opfs-wl'
+sqlite3_vfs` dan error bash Vite `sqlite3-opfs-async-proxy.js?vfs=...` berasal dari
+auto-install dua VFS async bawaan sqlite-wasm yang tidak dipakai Ventra. Keduanya
+sudah dinonaktifkan via query params `opfs-disable` & `opfs-wl-disable` pada URL
+worker (`db.ts`, assignment #24) — dibaca `opfsUtil.initOptions()` di dalam worker.
+Ventra hanya memakai VFS `opfs-sahpool`, yang tidak terpengaruh.
+
 **Alur diagnosis bila layar menampilkan galat database:**
 
 1. Klik **Salin detail teknis** → tempel ke laporan/chat.
