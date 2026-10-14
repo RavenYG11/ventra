@@ -61,7 +61,7 @@ export async function suntingBarang(id: number, input: BarangUbah): Promise<Hasi
   const v = validasiForm(input);
   if (v) return { ok: false, galat: v };
   const ada = await ambilBarang(id);
-  if (!ada) return { ok: false, galat: 'Barang tidak ditemukan.' };
+  if (!ada || ada.aktif !== 1) return { ok: false, galat: 'Barang tidak ditemukan.' };
   await ubahBarang(id, input);
   return { ok: true };
 }

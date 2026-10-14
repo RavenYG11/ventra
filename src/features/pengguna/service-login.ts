@@ -2,7 +2,13 @@
 // Keputusan final Rama: reset = cek username → field reset unrestricted (tanpa password lama).
 import bcrypt from 'bcryptjs';
 import type { Hasil } from '../../types';
-import { ambilPengguna, buatPengguna, hitungPengguna, ubahKataSandi } from './repo-pengguna';
+import {
+  ambilPengguna,
+  buatPengguna,
+  catatAuditKeamanan,
+  hitungPengguna,
+  ubahKataSandi,
+} from './repo-pengguna';
 
 const KUNCI_SESI = 'ventra_sesi';
 
@@ -42,10 +48,13 @@ export async function daftarAkunPertama(
 }
 
 export async function masuk(namaPengguna: string, kataSandi: string): Promise<Hasil<void>> {
-  const akun = await ambilPengguna(namaPengguna);
-  if (!akun) return { ok: false, galat: 'Nama pengguna atau kata sandi salah.' };
-  const cocok = await bcrypt.compare(kataSandi, akun.kata_sandi_hash);
-  if (!cocok) return { ok: false, galat: 'Nama pengguna atau kata sandi salah.' };
+  const nama = namaPengguna.trim().toLowerCase();
+  const akun = await ambilPengguna(nama);
+  const cocok = akun ? await bcrypt.compare(kataSandi, akun.kata_sandi_hash) : false;
+  // Audit: login berhasil maupun gagal dicatat (§8). Pesan ke user tetap
+  // generik agar tidak membocorkan username mana yang terdaftar.
+  await catatAuditKeamanan('login', nama, cocok ? 'berhasil' : 'gagal');
+  if (!akun || !cocok) return { ok: false, galat: 'Nama pengguna atau kata sandi salah.' };
   localStorage.setItem(KUNCI_SESI, akun.nama_pengguna);
   return { ok: true };
 }
@@ -81,6 +90,9 @@ export async function setelUlangKataSandi(
   if (v) return { ok: false, galat: v };
   const hash = await bcrypt.hash(kataSandiBaru, 10);
   await ubahKataSandi(akun.nama_pengguna, hash);
-  // TODO(v0.4/Cipher): catat event password_reset ke audit log keamanan.
+  // Audit §8: setiap reset dicatat (peristiwa + waktu + akun + status).
+  // Catatan jujur: log mencatat BAHWA reset terjadi, bukan SIAPA pelakunya —
+  // alur ini memang tidak memverifikasi identitas (risiko diterima Rama).
+  await catatAuditKeamanan('password_reset', akun.nama_pengguna, 'berhasil');
   return { ok: true };
 }

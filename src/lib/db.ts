@@ -2,6 +2,7 @@
 // Aturan Gunet: UI tidak boleh query DB langsung — semua lewat service → repo → file ini.
 import Database from '@tauri-apps/plugin-sql';
 import migrasi001 from '../../migrasi/001_awal.sql?raw';
+import migrasi002 from '../../migrasi/002_audit_keamanan.sql?raw';
 
 let db: Database | null = null;
 
@@ -14,7 +15,10 @@ export async function dapatkanDb(): Promise<Database> {
   return db;
 }
 
-const DAFTAR_MIGRASI: Array<[string, string]> = [['001_awal', migrasi001]];
+const DAFTAR_MIGRASI: Array<[string, string]> = [
+  ['001_awal', migrasi001],
+  ['002_audit_keamanan', migrasi002],
+];
 
 async function jalankanMigrasi(database: Database): Promise<void> {
   await database.execute(
@@ -23,7 +27,7 @@ async function jalankanMigrasi(database: Database): Promise<void> {
        diterapkan_pada TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
      )`
   );
-  const sudah: Array<{ versi: string }> = await database.select('SELECT versi FROM migrasi');
+  const sudah = await database.select<Array<{ versi: string }>>('SELECT versi FROM migrasi');
   const terapkan = new Set(sudah.map((r) => r.versi));
   for (const [versi, sql] of DAFTAR_MIGRASI) {
     if (terapkan.has(versi)) continue;

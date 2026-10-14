@@ -14,12 +14,13 @@ CREATE TABLE IF NOT EXISTS kategori (
   dibuat_pada       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
--- Master barang: satu baris = satu SKU. barcode = kode (keputusan final).
+-- Master barang: satu baris = satu SKU.
+-- Barcode = kode (keputusan final model-data.md §2): TIDAK ada kolom barcode
+-- terpisah. Barcode Code128 di-generate dari `kode` dan tampil di UI saja.
 CREATE TABLE IF NOT EXISTS barang (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   kode          TEXT NOT NULL UNIQUE,
   nama          TEXT NOT NULL,
-  barcode       TEXT NOT NULL UNIQUE,
   kategori_id   INTEGER NOT NULL REFERENCES kategori(id) ON DELETE RESTRICT,
   satuan        TEXT NOT NULL DEFAULT 'pcs' CHECK (satuan = 'pcs'),
   harga_beli    INTEGER NOT NULL DEFAULT 0 CHECK (harga_beli >= 0),
@@ -95,4 +96,5 @@ FROM barang b
 JOIN kategori k ON k.id = b.kategori_id;
 
 -- Seed: kategori bawaan supaya pola BRG-0000001 langsung bisa dipakai.
-INSERT OR IGNORE INTO kategori (nama, prefix_kode) VALUES ('Umum', 'BRG');
+-- Prefix 'BRG-' sesuai contoh final di specs/model-data.md §2.
+INSERT OR IGNORE INTO kategori (nama, prefix_kode) VALUES ('Umum', 'BRG-');

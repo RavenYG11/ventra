@@ -17,7 +17,7 @@ export interface BarangBaru {
 export async function daftarBarang(kataKunci = ''): Promise<Barang[]> {
   const db = await dapatkanDb();
   const k = `%${kataKunci.trim().toLowerCase()}%`;
-  return db.select(
+  return db.select<Barang[]>(
     `SELECT * FROM v_barang
       WHERE aktif = 1
         AND (lower(nama) LIKE $1 OR lower(kode) LIKE $1)
@@ -28,7 +28,7 @@ export async function daftarBarang(kataKunci = ''): Promise<Barang[]> {
 
 export async function ambilBarang(id: number): Promise<Barang | null> {
   const db = await dapatkanDb();
-  const baris: Barang[] = await db.select('SELECT * FROM v_barang WHERE id = $1', [id]);
+  const baris = await db.select<Barang[]>('SELECT * FROM v_barang WHERE id = $1', [id]);
   return baris[0] ?? null;
 }
 
@@ -61,7 +61,7 @@ export async function tambahBarangAtomik(
   dibuatOleh: string
 ): Promise<string> {
   const db = await dapatkanDb();
-  const baris: Array<{ id: number; kode: string }> = await db.select(
+  const baris = await db.select<Array<{ id: number; kode: string }>>(
     `WITH kategori_dinaikkan AS (
        UPDATE kategori
           SET nomor_urut_terakhir = nomor_urut_terakhir + 1

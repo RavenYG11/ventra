@@ -5,7 +5,7 @@ import type { Kategori } from '../../types';
 export async function daftarKategori(termasukNonaktif = false): Promise<Kategori[]> {
   const db = await dapatkanDb();
   const klausa = termasukNonaktif ? '' : 'WHERE aktif = 1';
-  return db.select(`SELECT * FROM kategori ${klausa} ORDER BY nama`);
+  return db.select<Kategori[]>(`SELECT * FROM kategori ${klausa} ORDER BY nama`);
 }
 
 export async function tambahKategori(nama: string, prefixKode: string): Promise<number> {
@@ -33,7 +33,7 @@ export async function nonaktifkanKategori(id: number): Promise<void> {
 
 export async function hitungBarangDiKategori(id: number): Promise<number> {
   const db = await dapatkanDb();
-  const baris: Array<{ jml: number }> = await db.select(
+  const baris = await db.select<Array<{ jml: number }>>(
     'SELECT COUNT(*) AS jml FROM barang WHERE kategori_id = $1 AND aktif = 1',
     [id]
   );

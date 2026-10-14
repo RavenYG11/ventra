@@ -13,10 +13,9 @@ export type StatusStok = 'aman' | 'menipis' | 'habis';
 
 export interface Barang {
   id: number;
+  /** Kode unik auto-generate (prefix kategori + 7 digit). Barcode = kode. */
   kode: string;
   nama: string;
-  /** barcode = kode (keputusan final). */
-  barcode: string;
   kategori_id: number;
   kategori_nama?: string;
   satuan: string; // selalu 'pcs'

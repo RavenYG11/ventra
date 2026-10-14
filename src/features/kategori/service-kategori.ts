@@ -2,7 +2,6 @@
 import type { Hasil, Kategori } from '../../types';
 import {
   daftarKategori,
-  hitungBarangDiKategori,
   nonaktifkanKategori,
   tambahKategori,
   ubahKategori,
@@ -44,13 +43,9 @@ export async function suntingKategori(
   }
   const v = validasiPrefix(prefixKode);
   if (v) return { ok: false, galat: v };
-  // Prefix tidak boleh diubah bila kategori sudah pernah menerbitkan kode,
-  // supaya kode lama tidak menjadi yatim.
-  const semua = await daftarKategori(true);
-  const kat = semua.find((k) => k.id === id);
-  if (kat && kat.nomor_urut_terakhir > 0 && kat.prefix_kode !== prefixKode.trim().toUpperCase()) {
-    return { ok: false, galat: 'Prefix tidak bisa diubah: kategori ini sudah menerbitkan kode barang.' };
-  }
+  // Prefix BOLEH diubah (keputusan final model-data.md §2 aturan 5):
+  // kode barang yang sudah terbit TIDAK berubah (historis) —
+  // hanya barang baru yang memakai prefix baru. Counter tidak di-reset.
   try {
     await ubahKategori(id, nama, prefixKode);
     return { ok: true };
@@ -59,14 +54,14 @@ export async function suntingKategori(
   }
 }
 
+/**
+ * Nonaktifkan kategori (soft delete) — SELALU boleh, walau masih punya barang.
+ * Barang lama yang merujuknya tetap utuh (riwayat tidak patah); kategori
+ * nonaktif disembunyikan dari pilihan dan tidak bisa dipakai barang baru.
+ * Hapus permanen kategori yang masih punya barang ditolak database
+ * (ON DELETE RESTRICT) — tidak ada jalur hapus permanen di aplikasi.
+ */
 export async function hapusKategori(id: number): Promise<Hasil<void>> {
-  const dipakai = await hitungBarangDiKategori(id);
-  if (dipakai > 0) {
-    return {
-      ok: false,
-      galat: `Kategori masih dipakai ${dipakai} barang aktif — tidak bisa dinonaktifkan.`,
-    };
-  }
   await nonaktifkanKategori(id);
   return { ok: true };
 }

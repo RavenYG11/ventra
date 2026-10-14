@@ -1,0 +1,1 @@
+{"$schema":"../gen/schemas/desktop-schema.json","description":"Capability bawaan Ventra: akses database lokal via @tauri-apps/plugin-sql (baca + tulis + DDL untuk migrasi).","identifier":"default","permissions":["sql:default","sql:allow-execute"],"windows":["main"]}

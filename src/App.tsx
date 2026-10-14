@@ -51,7 +51,7 @@ export default function App() {
         </div>
       </header>
 
-      {tab === 'barang' && <BarangPage tampilToast={setToast} />}
+      {tab === 'barang' && <BarangPage namaPengguna={pengguna} tampilToast={setToast} />}
 
       {toast && <div className="toast">{toast}</div>}
     </>
