@@ -12,15 +12,8 @@ export default defineConfig({
   build: {
     target: 'es2021',
   },
-  server: {
-    // Header COOP/COEP untuk `npm run dev` — mengikuti pola demo resmi
-    // sqlite-wasm (github.com/sqlite/sqlite-wasm, demos/sahpool-demo).
-    // Catatan: VFS opfs-sahpool yang dipakai Ventra TIDAK mewajibkan
-    // header ini (sqlite.org/wasm/doc/trunk/persistence.md), jadi deploy
-    // XAMPP tanpa header tambahan tetap jalan.
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
+  // Catatan: header COOP/COEP SENGAJA tidak dipasang. VFS opfs-sahpool
+  // yang dipakai Ventra tidak mewajibkannya
+  // (sqlite.org/wasm/doc/trunk/persistence.md), dan COEP require-corp
+  // berisiko memblokir pemuatan sqlite3.wasm di dev server.
 });

@@ -24,7 +24,12 @@ export default function LoginPage({ onMasuk }: { onMasuk: (nama: string) => void
   useEffect(() => {
     apakahButuhSetupAwal()
       .then((butuh) => setMode(butuh ? 'setup' : 'login'))
-      .catch(() => setGalat('Gagal membuka database. Coba lagi.'));
+      .catch((e) => {
+        // PENTING: jangan diam di mode 'memuat' — tampilkan galat + tombol muat ulang.
+        setGalat(
+          'Gagal membuka database: ' + (e instanceof Error ? e.message : String(e))
+        );
+      });
   }, []);
 
   function resetForm() {
@@ -101,7 +106,18 @@ export default function LoginPage({ onMasuk }: { onMasuk: (nama: string) => void
   if (mode === 'memuat') {
     return (
       <div className="login-wrap">
-        <div className="panel kosong">Memuat…</div>
+        <div className="panel kosong">
+          {galat ? (
+            <>
+              <PesanGalat pesan={galat} />
+              <div style={{ marginTop: 12 }}>
+                <Tombol onClick={() => window.location.reload()}>Muat ulang</Tombol>
+              </div>
+            </>
+          ) : (
+            'Memuat…'
+          )}
+        </div>
       </div>
     );
   }
