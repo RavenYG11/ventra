@@ -82,7 +82,7 @@ ventra/
 │   │   │   ├── skema-pengguna.js    # Struktur: username, hash password, info reset
 │   │   │   ├── repo-pengguna.js     # Baca/tulis tabel user & pengaturan
 │   │   │   ├── service-login.js      # Verifikasi login (bandingkan hash) [MENUNGGU CIPHER: skema hash]
-│   │   │   └── service-reset.js      # Reset password tanpa password lama [MENUNGGU CIPHER: mekanisme]
+│   │   │   └── service-reset.js      # Reset password tanpa password lama (FINAL 14 Okt 2026: username → cek akun → unrestricted)
 │   │   │
 │   │   └── audit/                   # Domain: jejak audit
 │   │       ├── skema-audit.js       # Struktur: siapa, kapan, aksi, detail (stok sebelum/sesudah)
@@ -191,7 +191,7 @@ Definisi versi mengacu pada Kurniatot (spesifikasi MVP final, sedang dikerjakan)
 
 | # | Pekerjaan | Kriteria selesai | Ketergantungan |
 |---|---|---|---|
-| 1 | Reset password tanpa password lama | Mekanisme reset berfungsi sesuai rancangan Cipher | **Cipher** (pilih 1 mekanisme) |
+| 1 | Reset password tanpa password lama | Username → cek keberadaan akun → jika ada, field reset unrestricted (langsung set password baru). Event reset dicatat di audit log | **FINAL 14 Okt 2026** (Cipher — lihat stock-barang-mvp-v1.md §8) |
 | 2 | Backup otomatis database lokal | Backup berjalan otomatis SETIAP aplikasi ditutup; 7 file backup terbaru disimpan (retensi 7 hari); penyimpanan lokal saja, tanpa flashdisk/cloud; restore teruji | **Epthal** (implementasi + runbook restore) |
 | 3 | Packaging → installer Windows | Installer 64-bit untuk Windows 10/11 yang bisa diklik dua kali di laptop Rama | `Ventra-setup.exe` (NSIS, Windows 64-bit) |
 | 4 | Runbook operasional | Dokumen: cara install, backup/restore, apa yang dilakukan saat data bermasalah | **Epthal** |
@@ -255,7 +255,7 @@ Prinsip: **progres dinilai dari hasil yang terverifikasi** (bisa didemokan/dites
 
 **Masih terbuka:**
 
-7. Skema hash password & mekanisme reset — **menunggu Cipher**.
+7. Skema hash password & mekanisme reset — **FINAL 14 Okt 2026** (username → cek keberadaan akun → unrestricted; lihat stock-barang-mvp-v1.md §8).
 8. Detail implementasi backup (format file, lokasi folder, runbook restore) — **menunggu Epthal**, di dalam batas keputusan #4 di atas.
 
 ---

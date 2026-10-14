@@ -60,7 +60,7 @@ Keputusan ini hasil konvergensi tiga lensa: Gunet (kemudahan dibangun & dirawat)
 | Scan via kamera laptop | **@zxing/browser** | Pure-JS/WASM, jalan offline, minta izin kamera sekali. **Jalur utama & SATU-SATUNYA** (jawaban final Rama — opsi USB scanner keyboard-wedge dihapus). |
 | Export Excel | **xlsx (SheetJS Community)** | Pure-JS, tulis file `.xlsx` asli, dibundel via npm (bukan CDN) agar offline penuh. Alur: `XLSX.utils.json_to_sheet(data)` → `XLSX.writeFile(wb, 'laporan.xlsx')`. Kunci versi & verifikasi lisensi Apache-2.0 sebelum build (cocok untuk pemakaian internal). |
 | Export PDF | **jspdf + jspdf-autotable** | Laporan = tabel otomatis rapi (kop, header, nomor halaman) via autotable. |
-| Hash password | **bcryptjs** | Pure-JS, offline. Password & kode pemulihan tidak pernah disimpan plain-text (kebijakan Cipher). |
+| Hash password | **bcryptjs** | Pure-JS, offline. Password tidak pernah disimpan plain-text (kebijakan Cipher). |
 
 **Detail implementasi barcode (dari Magna):** ukuran modul minimum + quiet zone agar barcode tetap mudah dipindai walau hanya tampil di layar. Barcode ditampilkan di halaman Master Barang / Detail Barang (display-only, tanpa cetak).
 
@@ -77,7 +77,7 @@ Keputusan ini hasil konvergensi tiga lensa: Gunet (kemudahan dibangun & dirawat)
 **Di laptop Rama:**
 1. Klik dua kali `Ventra-setup.exe` → Next → Finish (±1 menit).
 2. Ikon "Ventra" muncul di desktop & Start Menu → buka aplikasi.
-3. **Setup pertama:** buat username + password → aplikasi menampilkan **kode pemulihan** satu kali → Rama catat/cetak dan simpan di tempat aman.
+3. **Setup pertama:** buat username + password → selesai. (Tidak ada kode pemulihan — reset password via username-check → unrestricted.)
 4. Login tiap membuka aplikasi (satu akun, tanpa peran — sesuai keputusan terkunci).
 
 **Lokasi data (Windows):** `%APPDATA%\Ventra\stok.db` (+ folder `backup\` di sebelahnya).
@@ -117,7 +117,7 @@ src-tauri/          # konfigurasi Tauri + kode Rust MINIMAL (dialog file native,
 - Hampir semua logika di TypeScript (±95% kode); Rust hanya untuk yang tidak bisa dilakukan web.
 - Transaksi stok (update stok + tulis audit trail) selalu dalam **satu transaksi atomik** di `db.ts`.
 
-**Modul fitur (isi aplikasi):** Auth (login wajib; lupa password via kode pemulihan, tanpa menanyakan password lama) → Dashboard (total SKU, total nilai stok, indikator visual stok menipis) → Master Barang (CRUD: nama, kode/SKU, harga beli, harga jual, stok awal, stok minimum; **margin Rp/% dan nilai stok auto-calculate**) → Barcode (generate Code128 per item, **tampil di UI saja — display-only, tanpa cetak label**) → Transaksi Stok (masuk/keluar; **keluar melebihi stok langsung ditolak** di aplikasi + constraint database) → Laporan (stok & mutasi per periode; export Excel & PDF) → Pengaturan & Backup.
+**Modul fitur (isi aplikasi):** Auth (login wajib; lupa password = username → cek keberadaan akun → jika ada, reset unrestricted langsung set password baru, tanpa password lama) → Dashboard (total SKU, total nilai stok, indikator visual stok menipis) → Master Barang (CRUD: nama, kode/SKU, harga beli, harga jual, stok awal, stok minimum; **margin Rp/% dan nilai stok auto-calculate**) → Barcode (generate Code128 per item, **tampil di UI saja — display-only, tanpa cetak label**) → Transaksi Stok (masuk/keluar; **keluar melebihi stok langsung ditolak** di aplikasi + constraint database) → Laporan (stok & mutasi per periode; export Excel & PDF) → Pengaturan & Backup.
 
 ## 8. Skema data inti (ringkas — detail penuh di `specs/model-data.md`)
 
@@ -136,7 +136,7 @@ src-tauri/          # konfigurasi Tauri + kode Rust MINIMAL (dialog file native,
 4. **Multi-user/multi-cabang di masa depan?** — Dijawab sebagai catatan arsitektur di Bagian 10 (bukan keputusan bangun-sekarang).
 5. **Perkiraan jumlah barang** — ✅ **TERKONFIRMASI: <10.000 SKU** (jawaban final Rama). SQLite aman sampai jutaan baris.
 6. **Lokasi backup eksternal** — ❌ **DIHAPUS.** Backup hanya lokal otomatis saat aplikasi ditutup, retensi 7 hari (jawaban final Rama).
-7. **Mekanisme lupa password** — ⏳ **masih perlu konfirmasi Rama.** Disarankan **kode pemulihan** (ditampilkan sekali saat setup, disimpan Rama). Alternatif: pertanyaan keamanan.
+7. **Mekanisme lupa password** — ✅ **TERKUNCI (14 Okt 2026):** user memasukkan username → sistem mengecek keberadaan akun → jika ada, field reset password menjadi **unrestricted** (langsung set password baru tanpa password lama). Opsi kode pemulihan & pertanyaan keamanan DIBATALKAN. Lihat `stock-barang-mvp-v1.md` §8.
 
 ## 10. Asumsi, batasan & langkah berikut
 
