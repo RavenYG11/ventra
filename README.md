@@ -9,6 +9,11 @@ atas keputusan Rama 14 Okt 2026: tanpa install Rust, tanpa `.exe`): React + Vite
 SQLite-WASM, database + migrasi, login satu akun, master barang + kategori CRUD
 (kode otomatis), layar login / daftar barang / kelola kategori ala Template B.
 
+**Update 14 Okt 2026 (assignment #26):** fitur **Kode Barang** — entitas `kode_barang`
+tersendiri + mapping M:N kategori↔kode barang (keputusan Rama Q2) + menu baru
+**Product Management** (keputusan Rama Q1). Migrasi `003_kode_barang` berjalan otomatis
+(backfill dari prefix kategori lama). Mockup: `docs/mockup-product-management.html`.
+
 ## Tech stack
 
 - **TypeScript + React (Vite)** — aplikasi web murni, hasil build = file statis (`dist/`)
@@ -127,7 +132,8 @@ Kode v0.1 edisi web sudah ditulis dan direview, tapi **belum diverifikasi compil
 1. `npm install` (pastikan `@sqlite.org/sqlite-wasm` terunduh utuh)
 2. `npm run build` (pastikan `tsc` lolos + `dist/` terbentuk, termasuk `sqlite3.wasm`)
 3. Copy `dist/` → `C:\xampp\htdocs\ventra`, start Apache, buka http://localhost/ventra
-4. Uji: setup akun → login → tambah kategori → tambah barang (kode auto-generate) →
+4. Uji: setup akun → login → Product Management (tambah kode barang, hubungkan mapping) →
+   tambah barang (pilih kategori → kode barang → kode auto-generate + preview) →
    muat ulang halaman (data tetap ada = OPFS jalan) → **Unduh Backup** (file .db terunduh)
 
 ## Keputusan terkunci (ringkas)

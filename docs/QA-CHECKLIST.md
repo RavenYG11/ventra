@@ -151,6 +151,40 @@ Catatan: database XAMPP (`localhost:80`) **terpisah** dari database dev (`localh
 
 ---
 
+## I. Migrasi 003 — Fitur Kode Barang (assignment #26)
+
+### 22. Kategori lama otomatis jadi kode barang (backfill)
+Langkah: setelah `git pull`, buka aplikasi (migrasi 003 berjalan otomatis sekali).
+Buka menu **Product Management** → tab **Kode Barang**.
+Harapan: setiap kategori lama muncul sebagai 1 kode barang (kode = prefix lama, nama = "Kode <nama kategori>", counter = nilai lama). Tab **Mapping** menunjukkan relasi 1:1 awal. [ ]
+
+### 23. Barang lama tetap valid + counter tidak reset
+Langkah: di tab Kode Barang, catat "No. Urut Terakhir" sebuah kode. Tambah 1 barang baru memakai kode itu.
+Harapan: kode baru = kelanjutan nomor lama (tidak mulai dari 1); barang lama tetap tampil dengan kolom **Kode Barang** terisi. [ ]
+
+### 24. CRUD kode barang + validasi pola
+Langkah: tambah kode `ELK-SRV-` (nama "Kode servis") → coba tambah lagi kode yang sama → coba kode `elk srv` (spasi/huruf kecil).
+Harapan: tambah pertama lolos; duplikat DITOLAK ("Kode sudah dipakai"); pola salah DITOLAK dengan pesan jelas. [ ]
+
+### 25. Mapping M:N fleksibel
+Langkah: di tab Mapping, hubungkan kode `BRG-` ke 2 kategori berbeda.
+Harapan: lolos (1 kode boleh dipakai banyak kategori). Coba lepas mapping aktif TERAKHIR milik suatu kategori.
+Harapan: DITOLAK ("kategori wajib punya minimal 1 kode barang aktif"). [ ]
+
+### 26. Form Tambah Barang baru
+Langkah: pilih kategori yang hanya punya 1 kode barang → dropdown Kode Barang terisi otomatis + preview "Kode berikutnya" muncul. Pilih kategori tanpa kode barang.
+Harapan: auto-fill + preview benar; kategori tanpa kode menampilkan peringatan kuning dan dropdown disabled. [ ]
+
+### 27. Validasi nonaktifkan kategori berisi barang
+Langkah: di tab Kategori, coba nonaktifkan kategori yang masih punya barang aktif.
+Harapan: DITOLAK dengan pesan jelas. [ ]
+
+### 28. Restore backup lama → migrasi otomatis
+Langkah: restore file backup `.db` dari SEBELUM fitur ini (bila ada) → buka aplikasi.
+Harapan: migrasi 003 berjalan otomatis, data utuh, menu Product Management tampil. [ ]
+
+---
+
 ## Fitur yang BELUM ADA di v0.1 — jangan diuji dulu
 
 - **Scan barcode via kamera** (pustaka `@zxing/browser` terdaftar tapi belum dipakai di kode) — direncanakan v0.2+

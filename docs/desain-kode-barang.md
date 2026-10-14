@@ -1,7 +1,11 @@
 # Desain Fitur "Kode Barang" — Ventra
 
 **Disusun oleh:** Kurniatot (Software & Project Analyst) — 14 Okt 2026
-**Status:** PROPOSAL — menunggu persetujuan Rama sebelum implementasi
+**Status:** DISETUJUI Rama 14 Okt 2026 ~20:13 WIB — diimplementasikan assignment #26.
+**Keputusan final Rama (Q1–Q4):** Q1 nama menu = **"Product Management"**; Q2 relasi **M:N fleksibel penuh**
+(1 kode barang boleh dipakai banyak kategori — desain strict 1:N di bawah DIBATALKAN);
+Q3 dropdown kode barang **auto-fill** bila kategori hanya punya 1; Q4 kategori **wajib** punya
+minimal 1 kode barang aktif.
 **Latar:** Permintaan Rama 14 Okt 2026 ~20:03 WIB: (1) menu baru untuk CRUD "komponen barang"
 (kategori, kode barang); (2) Kode Barang jadi entitas CRUD tersendiri; (3) mapping
 kategori ↔ kode barang dikelola terpisah, karena 1 kategori bisa punya >1 kode barang;
@@ -19,7 +23,7 @@ kategori ↔ kode barang dikelola terpisah, karena 1 kategori bisa punya >1 kode
 | Counter nomor urut | Kolom `kategori.nomor_urut_terakhir` | Kolom `kode_barang.nomor_urut_terakhir` (per kode barang) |
 | Hubungan kategori–kode | Implisit (prefix menempel di kategori) | Tabel mapping `kategori_kode_barang`, dikelola di UI tersendiri |
 | Kardinalitas | 1 kategori : 1 prefix | 1 kategori : N kode barang (lihat §3 untuk batasannya) |
-| Menu | Barang, Transaksi (+ tombol KATEGORI di halaman Barang) | Barang, Transaksi, **Master Data** (baru) |
+| Menu | Barang, Transaksi (+ tombol KATEGORI di halaman Barang) | Barang, Transaksi, **Product Management** (baru, keputusan Q1) |
 | Form tambah barang | Pilih kategori → kode auto-generate | Pilih kategori → pilih kode barang → kode auto-generate + preview |
 
 Prinsip yang TIDAK berubah: kode barang tetap auto-generate & final (tidak bisa diubah);
@@ -43,7 +47,7 @@ CREATE TABLE kategori (
 );
 ```
 
-Di UI Master Data → tab Kategori, form kategori kini hanya berisi **nama**
+Di UI Product Management → tab Kategori, form kategori kini hanya berisi **nama**
 (prefix tidak lagi diisi di sini — prefix dikelola di tab Kode Barang).
 
 ### 2.2 `kode_barang` (BARU)
@@ -86,8 +90,8 @@ CREATE TABLE kategori_kode_barang (
   kategori_id    INTEGER NOT NULL REFERENCES kategori(id) ON DELETE RESTRICT,
   kode_barang_id INTEGER NOT NULL REFERENCES kode_barang(id) ON DELETE RESTRICT,
   dibuat_pada    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  PRIMARY KEY (kategori_id, kode_barang_id),
-  UNIQUE (kode_barang_id)   -- penegak 1:N, lihat §3
+  PRIMARY KEY (kategori_id, kode_barang_id)
+  -- SENGAJA tanpa UNIQUE(kode_barang_id): M:N fleksibel penuh (keputusan Rama Q2)
 );
 ```
 
@@ -108,22 +112,21 @@ dan dropdown "kode barang" di form konsisten dengan data.
 
 ## 3. Relasi & aturan kardinalitas
 
-**Keputusan desain (usulan): 1 kategori : N kode barang — dan 1 kode barang
-hanya milik 1 kategori (strict 1:N).**
+**Keputusan FINAL Rama (Q2, 14 Okt 2026): M:N fleksibel penuh — 1 kategori boleh punya
+banyak kode barang, DAN 1 kode barang boleh dipakai banyak kategori.**
+(Desain awal mengusulkan strict 1:N; DIBATALKAN oleh Rama: "bener2 fleksibel relasinya".)
 
 Artinya:
-- Satu kategori boleh punya banyak kode barang (permintaan Rama — terpenuhi).
-- Satu kode barang TIDAK boleh dipakai dua kategori.
+- Satu kategori boleh punya banyak kode barang (permintaan awal Rama — terpenuhi).
+- Satu kode barang BOLEH dipakai dua kategori atau lebih (contoh: `BRG-` dipakai
+  kategori "Elektronik" dan "Pakaian").
+- Counter nomor urut menempel di `kode_barang` dan dipakai bersama lintas kategori
+  yang menggunakannya — ini konsekuensi yang disetujui Rama.
 
-Alasan:
-1. Counter nomor urut menempel di `kode_barang`. Kalau satu kode dipakai dua
-   kategori, nomor urutnya tercampur antar kategori (mis. `BRG-0000005` bisa jadi
-   milik kategori A atau B) — membingungkan dan merusak makna "kode per kategori".
-2. Aturan lama "prefix unik antar kategori" (model-data.md §2) dipertahankan
-   dalam bentuk baru: `kode_barang.kode` unik global.
-3. Tetap memakai tabel mapping (bukan FK langsung) supaya pengelolaannya
-   terpisah seperti permintaan Rama — dan bila suatu hari Rama butuh M:N murni,
-   cukup lepas constraint `UNIQUE (kode_barang_id)`, tanpa ubah struktur.
+Yang tetap dijaga:
+1. `kode_barang.kode` unik global (aturan lama "prefix unik" dipertahankan).
+2. Tabel mapping tetap dipakai (bukan FK langsung) supaya pengelolaannya terpisah
+   seperti permintaan Rama.
 
 Validasi mapping di aplikasi:
 - Setiap kategori **wajib punya minimal 1 kode barang aktif** yang ter-mapping.
@@ -144,12 +147,15 @@ Validasi mapping di aplikasi:
    keduanya independen.
 2. Format kode final **tetap**: `{kode}{7 digit zero-padded}`.
    Contoh: kode barang `ELK-SRV-`, counter 0 → 1 → **`ELK-SRV-0000001`**.
-3. Pembuatan barang **atomik dalam satu statement SQL** (pola CTE yang sama
-   seperti `tambahBarangAtomik` saat ini, hanya kunci counter-nya pindah dari
-   `kategori` ke `kode_barang`):
-   `UPDATE kode_barang SET nomor_urut_terakhir = ... + 1 WHERE id = ? AND aktif = 1`
-   → `INSERT INTO barang (kode = kode || printf('%07d', nomor), kode_barang_id, kategori_id, ...)`
-   → (opsional) transaksi "Stok awal". Semua dalam satu CTE — tidak ada nomor ganda.
+3. Pembuatan barang memakai **`UPDATE ... RETURNING` langsung** (bukan di dalam
+   CTE — temuan assignment #28: SQLite TIDAK mendukung DML di dalam klausa WITH,
+   terbukti syntax error di sqlite-wasm 3.53.4; pola CTE lama tidak pernah bisa jalan):
+   `UPDATE kode_barang SET nomor_urut_terakhir = ... + 1 WHERE id = ? AND aktif = 1
+   AND EXISTS (mapping ke kategori aktif) RETURNING kode, nomor_urut_terakhir`
+   → kode dirakit di aplikasi → `INSERT INTO barang (kode, kode_barang_id, kategori_id, ...)`
+   → (opsional) transaksi "Stok awal". Counter naik + nilai baru terbaca dalam SATU
+   statement (atomik); koneksi tunggal + satu tab + satu pengguna menjamin tidak ada
+   nomor ganda.
 4. Syarat pembuatan: kategori aktif + kode barang aktif + kode barang ter-mapping
    ke kategori tersebut. Ketiganya dicek di SQL yang sama (bila tidak terpenuhi,
    CTE kosong → operasi dibatalkan).
@@ -161,9 +167,9 @@ Validasi mapping di aplikasi:
 
 ## 5. Alur UI
 
-### 5.1 Menu baru: "Master Data" (nama usulan — lihat Q1 §8)
+### 5.1 Menu baru: "Product Management" (keputusan final Rama Q1)
 
-Menu utama menjadi: **Barang | Transaksi | Master Data**.
+Menu utama menjadi: **Barang | Transaksi | Product Management**.
 Isi halaman Master Data — tiga tab:
 
 **Tab 1 — Kategori** (CRUD, pindahan dari tombol KATEGORI)
@@ -188,7 +194,7 @@ Isi halaman Master Data — tiga tab:
   kode yang sudah terhubung ke kategori lain tidak muncul di "tersedia").
 
 **Nasib tombol KATEGORI di halaman Barang:** dihapus — diganti link kecil
-" Kelola di Master Data" agar tidak ada dua pintu untuk hal yang sama.
+"Kelola di Product Management →" agar tidak ada dua pintu untuk hal yang sama.
 
 ### 5.2 Perubahan form Tambah Barang
 
@@ -289,7 +295,7 @@ via `barang.kategori_id`.
 | Counter hanya naik via pembuatan barang, atomik | CTE satu statement (§4) |
 | Hapus kode_barang yang sudah dipakai barang | `ON DELETE RESTRICT` → tolak, arahkan ke nonaktifkan |
 | Kategori wajib ≥1 kode barang aktif ter-mapping | Validasi aplikasi (form barang + tab Mapping) |
-| 1 kode barang = 1 kategori | `UNIQUE (kode_barang_id)` di tabel mapping |
+| Relasi M:N fleksibel (Q2) | Tanpa UNIQUE di mapping; duplikasi pasangan dicegah PRIMARY KEY |
 | Kategori nonaktif / kode nonaktif tidak bisa untuk barang baru | Filter `aktif = 1` di dropdown + cek di CTE |
 
 ### 7.4 Dokumen yang wajib ikut diperbarui saat implementasi
@@ -299,7 +305,15 @@ via `barang.kategori_id`.
 
 ---
 
-## 8. Pertanyaan terbuka untuk Rama
+## 8. Pertanyaan untuk Rama — TERJAWAB (14 Okt 2026 ~20:13 WIB)
+
+**Q1. Nama menu baru** — **"Product Management"** (Rama memilih sendiri, bukan dari usulan).
+**Q2. Bolehkan 1 kode barang dipakai >1 kategori?** — **YA, fleksibel penuh (M:N).**
+Desain strict 1:N dibatalkan.
+**Q3. Kategori yang hanya punya 1 kode barang** — dropdown **langsung terisi otomatis**.
+**Q4. Bolehkan kategori tanpa kode barang sama sekali?** — **TIDAK BOLEH** (minimal 1).
+
+## 8a. (Arsip — pertanyaan awal saat proposal)
 
 **Q1. Nama menu baru** — usulan: **"Master Data"**. Alternatif: "Komponen",
 "Data Pokok". Mana yang paling enak dipakai sehari-hari?
