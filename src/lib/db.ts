@@ -57,12 +57,21 @@ const muatSqlite3 = sqlite3InitModule as unknown as (
   opsi?: { locateFile?: (nama: string) => string }
 ) => Promise<Sqlite3Api>;
 
+/** Hasil INSERT/UPDATE/DELETE/DDL — kompatibel dengan edisi Tauri (plugin-sql). */
+export interface HasilExecute {
+  /** Rowid dari INSERT terakhir di koneksi ini. Untuk non-INSERT, abaikan. */
+  lastInsertId: number;
+}
+
 /** Antarmuka database yang dipakai repo-*.ts (kompatibel dengan edisi Tauri). */
 export interface DbVentra {
   /** SELECT → array baris (objek). Contoh: db.select<Barang[]>(sql, [kataKunci]) */
   select<T>(sql: string, params?: NilaiParam[]): Promise<T>;
-  /** INSERT/UPDATE/DELETE/DDL — satu statement. */
-  execute(sql: string, params?: NilaiParam[]): Promise<void>;
+  /**
+   * INSERT/UPDATE/DELETE/DDL — satu statement.
+   * Mengembalikan lastInsertId (rowid INSERT terakhir di koneksi ini).
+   */
+  execute(sql: string, params?: NilaiParam[]): Promise<HasilExecute>;
 }
 
 // Nama file database di OPFS. VFS opfs-sahpool MEWAJIBKAN path absolut.
@@ -71,14 +80,45 @@ const NAMA_FILE_DB = '/stok.db';
 let pool: PoolUtil | null = null;
 let db: DbWasm | null = null;
 let janjiInisialisasi: Promise<DbVentra> | null = null;
+let deteksiTabMulai = false;
+
+// Batas waktu inisialisasi: bila OPFS hang (tidak resolve & tidak reject),
+// jangan biarkan aplikasi stuck selamanya di layar "Memuat…".
+const BATAS_WAKTU_INIT_MS = 15000;
 
 /**
  * Koneksi database tunggal. Inisialisasi (load WASM + buka OPFS + migrasi)
  * hanya terjadi sekali, lalu dipakai ulang — aman dipanggil berkali-kali.
  */
 export function dapatkanDb(): Promise<DbVentra> {
-  if (!janjiInisialisasi) janjiInisialisasi = inisialisasi();
+  mulaiDeteksiTabLain(); // idempoten — aman dipanggil berkali-kali
+  if (!janjiInisialisasi) janjiInisialisasi = inisialisasiDenganBatasWaktu();
   return janjiInisialisasi;
+}
+
+/** Inisialisasi + pemutus 15 detik bila OPFS hang. */
+async function inisialisasiDenganBatasWaktu(): Promise<DbVentra> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      inisialisasi(),
+      new Promise<never>((_, tolak) => {
+        timer = setTimeout(
+          () =>
+            tolak(
+              new Error(
+                'Inisialisasi database melebihi 15 detik — kemungkinan penyimpanan ' +
+                  'browser (OPFS) macet. Muat ulang halaman; bila tetap gagal, ' +
+                  'tutup semua tab Ventra lalu buka satu tab baru.'
+              )
+            ),
+          BATAS_WAKTU_INIT_MS
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 async function inisialisasi(): Promise<DbVentra> {
@@ -95,30 +135,48 @@ async function inisialisasi(): Promise<DbVentra> {
   if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function') {
     throw new Error('Browser ini tidak mendukung penyimpanan database lokal (OPFS).');
   }
+  // CATATAN (assignment #20, 2026-10-14): opsi `preserveOnInitFailure` — agar
+  // init yang gagal TIDAK me-wipe storage (perilaku default = removeVfs()) —
+  // baru tersedia di sqlite-wasm 3.54 (lihat sqlite.org/wasm/doc/trunk/
+  // persistence.md). Versi 3.54 BELUM terbit di npm (maksimum 3.53.4-build2
+  // per 2026-10-14), jadi flag ini BELUM dipakai. Saat 3.54 tersedia:
+  // upgrade package.json, lalu panggil installOpfsSAHPoolVfs({
+  // preserveOnInitFailure: true }).
   try {
     pool = await sqlite3.installOpfsSAHPoolVfs();
   } catch (e) {
     // JANGAN telan error asli — tampilkan agar bisa didiagnosis.
     const sebab = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      'Gagal membuka database lokal (' + sebab + '). Kemungkinan database sedang ' +
-        'dibuka di tab lain, atau mode private/incognito memblokir penyimpanan. ' +
-        'Tutup tab Ventra lain lalu muat ulang halaman ini.'
-    );
+    throw new Error('Gagal membuka database lokal (' + sebab + ').' + saranTabLain());
   }
 
-  // 3. Buka (atau buat) database. Satu koneksi di main thread — tidak ada
-  //    connection pool, jadi urutan query selalu terjaga.
-  db = new pool.OpfsSAHPoolDb(NAMA_FILE_DB);
-  await jalankanMigrasi(db);
+  // 3. Buka (atau buat) database + jalankan migrasi. Dibungkus try/catch agar
+  //    error asli (file terkunci, migrasi gagal, dsb.) tampil, bukan hilang.
+  //    Satu koneksi di main thread — tidak ada connection pool, jadi urutan
+  //    query selalu terjaga.
+  try {
+    db = new pool.OpfsSAHPoolDb(NAMA_FILE_DB);
+    await jalankanMigrasi(db);
+  } catch (e) {
+    const sebab = e instanceof Error ? e.message : String(e);
+    throw new Error('Gagal menyiapkan database (' + sebab + ').' + saranTabLain());
+  }
 
   const koneksi = db;
   const bungkus: DbVentra = {
     async select<T>(sql: string, params: NilaiParam[] = []): Promise<T> {
       return koneksi.selectObjects(normalisasiParam(sql), params) as unknown as T;
     },
-    async execute(sql: string, params: NilaiParam[] = []): Promise<void> {
+    async execute(sql: string, params: NilaiParam[] = []): Promise<HasilExecute> {
       koneksi.exec({ sql: normalisasiParam(sql), bind: params });
+      // last_insert_rowid() = rowid dari INSERT terakhir di koneksi ini.
+      // Aman: Ventra memakai SATU koneksi (lihat atas), jadi tidak ada interleaving
+      // antar pemanggil. Untuk statement non-INSERT, nilai ini = rowid INSERT
+      // terakhir sebelumnya — pemanggil mengabaikannya.
+      const baris = koneksi.selectObjects('SELECT last_insert_rowid() AS id') as Array<{
+        id: number;
+      }>;
+      return { lastInsertId: Number(baris[0]?.id ?? 0) };
     },
   };
   return bungkus;
@@ -132,6 +190,69 @@ async function inisialisasi(): Promise<DbVentra> {
  */
 function normalisasiParam(sql: string): string {
   return sql.replace(/\$(\d+)/g, '?$1');
+}
+
+// ---------------------------------------------------------------------------
+// Deteksi tab lain via BroadcastChannel (heartbeat ±300ms).
+// VFS opfs-sahpool HANYA boleh di-init satu tab per origin — tab kedua gagal
+// (lihat sqlite.org/wasm/doc/trunk/persistence.md § "OPFS SyncAccessHandle
+// Pool VFS" → Installation). Agar pesan error akurat ("tutup tab lain" vs
+// "OPFS diblokir browser"), tiap tab Ventra mengumumkan keberadaannya dan
+// tab ini mencatat pong terakhir yang diterima.
+// ---------------------------------------------------------------------------
+const ID_TAB = Math.random().toString(36).slice(2);
+const NAMA_CHANNEL_TAB = 'ventra-tab';
+
+let tabLainTerdeteksi = false;
+let waktuPongTerakhirMs = 0;
+
+function mulaiDeteksiTabLain(): void {
+  if (deteksiTabMulai) return;
+  deteksiTabMulai = true;
+  if (typeof BroadcastChannel === 'undefined') return;
+  try {
+    const ch = new BroadcastChannel(NAMA_CHANNEL_TAB);
+    ch.onmessage = (ev: MessageEvent) => {
+      const m = ev.data as { tipe?: string; dari?: string; ke?: string } | null;
+      if (!m || typeof m !== 'object') return;
+      if (m.tipe === 'ventra-ping' && m.dari !== ID_TAB) {
+        ch.postMessage({ tipe: 'ventra-pong', dari: ID_TAB, ke: m.dari });
+      } else if (m.tipe === 'ventra-pong' && m.ke === ID_TAB) {
+        tabLainTerdeteksi = true;
+        waktuPongTerakhirMs = Date.now();
+      }
+    };
+    const kirimPing = () => {
+      try {
+        ch.postMessage({ tipe: 'ventra-ping', dari: ID_TAB });
+      } catch {
+        // Abaikan — deteksi tab bukan fitur kritis.
+      }
+    };
+    kirimPing();
+    setInterval(kirimPing, 300);
+  } catch {
+    // BroadcastChannel tidak tersedia/gagal → deteksi nonaktif, bukan fatal.
+  }
+}
+
+/** True bila ada tab Ventra lain yang merespons dalam ~1 detik terakhir. */
+function apakahAdaTabLain(): boolean {
+  return tabLainTerdeteksi && Date.now() - waktuPongTerakhirMs < 1000;
+}
+
+/** Saran akurat untuk pesan error inisialisasi database. */
+function saranTabLain(): string {
+  if (apakahAdaTabLain()) {
+    return (
+      ' Terdeteksi tab Ventra lain sedang terbuka — tutup SEMUA tab Ventra, ' +
+      'lalu buka satu tab baru dan muat ulang halaman ini.'
+    );
+  }
+  return (
+    ' Tidak terdeteksi tab Ventra lain — kemungkinan penyimpanan browser (OPFS) ' +
+    'diblokir (mode private/incognito, profil browser bermasalah, atau disk penuh).'
+  );
 }
 
 // ---------------------------------------------------------------------------
