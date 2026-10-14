@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOCKUP — Product Management (Ventra)</title>
+<!--
+  MOCKUP high-fidelity klik-able — Menu "Product Management" (Ventra)
+  Dibuat oleh: Prapto (UI/UX Designer) — Assignment VO #27
+  Acuan: docs/desain-kode-barang.md + 4 keputusan Rama (14 Okt 2026):
+    Q1 nama menu 'Product Management' · Q2 relasi M:N fleksibel penuh ·
+    Q3 dropdown auto-fill bila 1 · Q4 kategori wajib ≥1 kode barang aktif.
+  Template B: gelap, operasional, kontras tinggi (specs/desain-template-b.md).
+  File ini MOCKUP STATIS — bukan kode aplikasi. Untuk review Rama & acuan Gunet.
+-->
+<style>
+:root{
+  --bg:#0e1116; --panel:#161b22; --panel2:#1c222b; --ink:#f2f5f9; --muted:#9aa4b2;
+  --line:#2a323d; --amber:#ffb020; --green:#22c55e; --green-d:#15803d;
+  --red:#ef4444; --red-d:#b91c1c; --blue:#38bdf8; --input:#0b0e13;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--bg); color:var(--ink); font-family:"Segoe UI",system-ui,-apple-system,sans-serif; font-size:14px;}
+/* ===== TOPBAR ===== */
+.topbar{position:sticky; top:0; z-index:50; background:#000; border-bottom:3px solid var(--amber); padding:10px 20px; display:flex; align-items:center; gap:18px;}
+.brand{font-size:22px; font-weight:900; letter-spacing:1px;}
+.brand small{display:block; font-size:10px; font-weight:600; color:var(--muted); letter-spacing:2px;}
+.navtabs{display:flex; gap:10px; margin:0 auto;}
+.navtab{padding:12px 26px; border:2px solid var(--line); border-radius:6px; background:transparent; color:var(--ink);
+  font-size:15px; font-weight:800; letter-spacing:.5px; cursor:pointer; text-transform:uppercase;}
+.navtab.active{background:var(--amber); color:#000; border-color:var(--amber);}
+.navtab:active{transform:scale(.98);}
+.who{font-size:13px; color:var(--muted);}
+.who a{color:var(--amber); font-weight:800; text-decoration:underline; cursor:pointer;}
+/* ===== LAYOUT ===== */
+.wrap{max-width:1180px; margin:0 auto; padding:22px 20px 80px;}
+.screen{display:none;}
+.screen.active{display:block;}
+h1.title{font-size:20px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;}
+.hint{color:var(--muted); font-size:13px; margin-bottom:16px;}
+.mocknote{background:#231a05; border:2px solid var(--amber); color:#ffd98a; border-radius:6px; padding:12px 16px; margin-bottom:18px; font-size:13px;}
+.mocknote b{color:var(--amber);}
+/* ===== SUB TABS ===== */
+.subtabs{display:flex; gap:10px; margin-bottom:16px;}
+.subtab{padding:10px 24px; border:2px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink);
+  font-size:14px; font-weight:800; letter-spacing:.5px; cursor:pointer; text-transform:uppercase;}
+.subtab.active{background:var(--amber); color:#000; border-color:var(--amber);}
+.subtab .cnt{background:#000; color:var(--amber); border-radius:10px; padding:1px 8px; font-size:11px; margin-left:6px;}
+.subtab.active .cnt{background:#000; color:var(--amber);}
+.tabpanel{display:none;}
+.tabpanel.active{display:block;}
+/* ===== PANEL & TOOLBAR ===== */
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px;}
+.toolbar{display:flex; gap:12px; align-items:center; margin-bottom:14px;}
+.toolbar .spacer{flex:1;}
+.search{max-width:380px; width:100%;}
+input[type=text],input[type=number],select,textarea{background:var(--input); color:var(--ink); border:2px solid var(--line);
+  border-radius:6px; padding:13px; font-size:16px; font-family:inherit; width:100%;}
+input:focus,select:focus,textarea:focus{outline:none; border-color:var(--amber);}
+select:disabled{background:var(--panel2); color:var(--muted); cursor:not-allowed;}
+label.flabel{display:block; font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--amber); margin:14px 0 6px;}
+label.flabel:first-child{margin-top:0;}
+/* ===== BUTTONS ===== */
+.btn{padding:12px 22px; border-radius:6px; font-size:14px; font-weight:800; letter-spacing:.5px; text-transform:uppercase;
+  cursor:pointer; border:2px solid var(--line); background:transparent; color:var(--ink);}
+.btn:active{transform:scale(.98);}
+.btn-amber{background:var(--amber); border-color:var(--amber); color:#000;}
+.btn-outline{background:transparent; border-color:var(--line); color:var(--ink);}
+.btn-danger{background:transparent; border-color:var(--red); color:var(--red);}
+.btn-small{padding:7px 14px; font-size:12px;}
+.btn-link{background:none; border:none; color:var(--amber); text-decoration:underline; font-weight:700; cursor:pointer; font-size:13px; padding:0;}
+/* ===== TABLE ===== */
+table.grid{width:100%; border-collapse:collapse;}
+table.grid th{background:#000; color:var(--amber); font-size:11.5px; text-transform:uppercase; letter-spacing:.5px;
+  text-align:left; padding:10px; border-bottom:2px solid var(--amber); white-space:nowrap;}
+table.grid td{padding:10px; border-bottom:1px solid var(--line); vertical-align:middle;}
+table.grid tr:last-child td{border-bottom:none;}
+.mono{font-family:Consolas,monospace; font-size:13px; color:var(--blue);}
+.num{text-align:right; font-variant-numeric:tabular-nums;}
+.badge{display:inline-block; padding:5px 14px; border-radius:4px; font-size:12px; font-weight:900; letter-spacing:.5px; text-transform:uppercase; white-space:nowrap;}
+.badge.ok{background:#052e16; color:var(--green); border:1px solid var(--green-d);}
+.badge.off{background:var(--panel2); color:var(--muted); border:1px solid var(--line);}
+.chip{display:inline-block; background:var(--panel2); border:1px solid var(--line); color:var(--blue); font-family:Consolas,monospace;
+  font-size:12px; border-radius:4px; padding:2px 8px; margin:1px 2px;}
+.emptyrow td{text-align:center; color:var(--muted); padding:28px 10px !important;}
+/* ===== BOXES ===== */
+.warnbox{background:#231a05; border:2px solid var(--amber); color:#ffd98a; border-radius:6px; padding:14px 16px; margin:12px 0; font-size:14px;}
+.warnbox b{color:var(--amber);}
+.errbox{background:var(--red); color:#fff; border-radius:6px; padding:16px; margin:12px 0; font-size:15px; font-weight:800;}
+.infobox{background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:14px 16px; margin:12px 0; color:var(--muted); font-size:13px;}
+.previewbox{border:2px solid var(--blue); border-radius:6px; padding:14px 16px; margin:12px 0; background:#0a1420;}
+.previewbox .plabel{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:4px;}
+.previewbox .pcode{font-family:Consolas,monospace; font-size:20px; color:var(--blue); font-weight:700;}
+/* ===== MAPPING ===== */
+.mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;}
+.mapcol{background:var(--input); border:1px solid var(--line); border-radius:6px; padding:14px;}
+.mapcol h3{font-size:13px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;}
+.mapcol h3 .n{color:var(--amber);}
+.mapitem{display:flex; align-items:center; justify-content:space-between; padding:9px 10px; border-bottom:1px solid var(--line);}
+.mapitem:last-child{border-bottom:none;}
+.mapitem .meta small{display:block; color:var(--muted); font-size:11px;}
+/* ===== MODAL ===== */
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; z-index:100;}
+.overlay.open{display:flex;}
+.modal{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:22px; width:440px; max-width:92vw;}
+.modal h2{font-size:17px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;}
+.modal .mrow{display:flex; gap:10px; margin-top:18px;}
+.modal .mrow .btn{flex:1;}
+.ferr{color:var(--red); font-size:12px; margin-top:5px; display:none;}
+/* ===== TOAST ===== */
+#toast{position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--amber); color:#000;
+  font-weight:900; text-transform:uppercase; letter-spacing:.5px; padding:14px 26px; border-radius:6px; max-width:92%;
+  opacity:0; transition:all .25s; z-index:200; pointer-events:none; text-align:center;}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+#toast.err{background:var(--red); color:#fff;}
+/* ===== GALERI ===== */
+.galeri{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px;}
+.gcard{background:var(--panel); border:1px dashed var(--line); border-radius:8px; padding:16px;}
+.gcard h4{font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--amber); margin-bottom:10px;}
+.formgrid{display:grid; grid-template-columns:1fr 1fr; gap:0 16px;}
+.footer-note{margin-top:34px; color:var(--muted); font-size:12px; text-align:center;}
+@media(max-width:760px){ .mapgrid,.galeri,.formgrid{grid-template-columns:1fr;} .navtabs{flex-wrap:wrap;} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">VENTRA<small>STOCK BARANG</small></div>
+  <div class="navtabs">
+    <button class="navtab" data-screen="s-barang">Barang</button>
+    <button class="navtab" data-screen="s-transaksi">Transaksi</button>
+    <button class="navtab active" data-screen="s-pm">Product Management</button>
+  </div>
+  <div class="who">1 AKUN: DEMO &nbsp;<a>KELUAR</a></div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ SCREEN: PRODUCT MANAGEMENT ============ -->
+  <section id="s-pm" class="screen active">
+    <div class="mocknote"><b>MOCKUP KLIK-ABLE</b> — Menu baru <b>Product Management</b> (keputusan Rama Q1). Coba: pindah tab, tambah/ubah data, hubungkan &amp; lepas mapping. Semua tombol &amp; dropdown berfungsi dengan data contoh.</div>
+    <h1 class="title">Product Management</h1>
+    <div class="hint">Kelola komponen barang: kategori, kode barang, dan relasi keduanya (M:N fleksibel — keputusan Rama Q2).</div>
+
+    <div class="subtabs">
+      <button class="subtab active" data-tab="t-kategori">Kategori<span class="cnt" id="cnt-kat">4</span></button>
+      <button class="subtab" data-tab="t-kode">Kode Barang<span class="cnt" id="cnt-kode">6</span></button>
+      <button class="subtab" data-tab="t-mapping">Mapping</button>
+    </div>
+
+    <!-- TAB KATEGORI -->
+    <div id="t-kategori" class="tabpanel active">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="text" class="search" placeholder="CARI: nama kategori…" id="searchKat" oninput="filterKat(this.value)">
+          <div class="spacer"></div>
+          <button class="btn btn-amber" onclick="openModal('m-kat-tambah')">+ Tambah Kategori</button>
+        </div>
+        <table class="grid">
+          <thead><tr><th>Nama Kategori</th><th>Kode Barang Terhubung</th><th class="num">Jml Barang</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody id="tbodyKat"></tbody>
+        </table>
+      </div>
+      <div class="infobox">Form kategori kini <b>hanya berisi nama</b> — prefix pindah ke tab Kode Barang. Kategori wajib punya <b>minimal 1 kode barang aktif</b> (keputusan Rama Q4): kategori tanpa mapping tidak bisa dipakai di form Tambah Barang.</div>
+    </div>
+
+    <!-- TAB KODE BARANG -->
+    <div id="t-kode" class="tabpanel">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="text" class="search" placeholder="CARI: kode / nama…" id="searchKode" oninput="filterKode(this.value)">
+          <div class="spacer"></div>
+          <button class="btn btn-amber" onclick="openModal('m-kode-tambah')">+ Tambah Kode Barang</button>
+        </div>
+        <table class="grid">
+          <thead><tr><th>Kode</th><th>Nama</th><th class="num">No. Urut Terakhir</th><th class="num">Jml Barang</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody id="tbodyKode"></tbody>
+        </table>
+      </div>
+      <div class="infobox">Satu baris = satu pola kode (prefix + counter-nya sendiri). <span class="mono">kode</span> unik global, pola <span class="mono">[A-Z0-9-]</span>, 1–10 karakter. Counter hanya naik lewat pembuatan barang (atomik) — tidak bisa diedit manual. Kode nonaktif hilang dari dropdown form barang, tapi barang lama tetap utuh.</div>
+    </div>
+
+    <!-- TAB MAPPING -->
+    <div id="t-mapping" class="tabpanel">
+      <div class="panel">
+        <label class="flabel" for="mapKat">Pilih Kategori</label>
+        <select id="mapKat" onchange="renderMapping()" style="max-width:420px"></select>
+        <div class="mapgrid">
+          <div class="mapcol">
+            <h3>Sudah terhubung <span class="n" id="mapConnN"></span></h3>
+            <div id="mapConnected"></div>
+          </div>
+          <div class="mapcol">
+            <h3>Tersedia <span class="n" id="mapAvailN"></span></h3>
+            <div id="mapAvailable"></div>
+          </div>
+        </div>
+        <div id="mapMsg"></div>
+      </div>
+      <div class="infobox">Relasi <b>M:N fleksibel penuh</b> (keputusan Rama Q2): 1 kategori boleh punya banyak kode barang, <b>dan</b> 1 kode barang boleh dipakai banyak kategori (contoh: <span class="mono">BRG-</span> dipakai Elektronik &amp; Pakaian). Tidak bisa melepas mapping aktif <b>terakhir</b> milik suatu kategori.</div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: TAMBAH BARANG (form diperbarui) ============ -->
+  <section id="s-barang-tambah" class="screen">
+    <div class="mocknote"><b>MOCKUP KLIK-ABLE</b> — Form <b>Tambah Barang</b> yang diperbarui. Coba ganti-ganti <b>Kategori</b>: dropdown Kode Barang otomatis terfilter sesuai mapping; kategori berkode tunggal langsung terisi otomatis (keputusan Rama Q3); kategori tanpa kode barang memunculkan peringatan.</div>
+    <h1 class="title">Tambah Barang</h1>
+    <div class="hint">Alur baru: pilih kategori → pilih kode barang → kode auto-generate + preview.</div>
+    <div class="panel">
+      <div class="formgrid">
+        <div>
+          <label class="flabel" for="fKat">Kategori</label>
+          <select id="fKat" onchange="onFormKat()"></select>
+          <div id="fKatWarn"></div>
+        </div>
+        <div>
+          <label class="flabel" for="fKode">Kode Barang</label>
+          <select id="fKode" onchange="onFormKode()"></select>
+        </div>
+      </div>
+      <div class="previewbox" id="fPreviewWrap">
+        <div class="plabel">Kode berikutnya (auto-generate, final)</div>
+        <div class="pcode" id="fPreview">—</div>
+      </div>
+      <div class="formgrid">
+        <div><label class="flabel">Nama Barang</label><input type="text" placeholder="cth: Kabel HDMI 2m"></div>
+        <div><label class="flabel">Stok Minimum (pcs)</label><input type="number" value="5" min="0"></div>
+        <div><label class="flabel">Harga Beli (Rp)</label><input type="number" placeholder="cth: 45000" min="0"></div>
+        <div><label class="flabel">Harga Jual (Rp)</label><input type="number" placeholder="cth: 65000" min="0"></div>
+      </div>
+      <label class="flabel">Stok Awal (pcs)</label>
+      <input type="number" value="0" min="0" style="max-width:220px">
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button class="btn btn-outline" onclick="gotoScreen('s-barang')">Batal</button>
+        <button class="btn btn-amber" style="flex:1" onclick="toast('TERSIMPAN: contoh barang (mockup)')">Simpan Barang</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: BARANG (placeholder existing) ============ -->
+  <section id="s-barang" class="screen">
+    <h1 class="title">Daftar Barang</h1>
+    <div class="hint">Layar existing — tidak berubah, kecuali satu hal di bawah.</div>
+    <div class="panel">
+      <div class="toolbar">
+        <input type="text" class="search" placeholder="CARI: nama / kode / barcode…">
+        <div class="spacer"></div>
+        <button class="btn btn-outline">Unduh Backup</button>
+        <button class="btn btn-amber" onclick="gotoScreen('s-barang-tambah')">+ Tambah Barang</button>
+      </div>
+      <div class="warnbox"><b>Perubahan:</b> tombol <b>KATEGORI</b> dihapus dari sini — diganti link kecil <button class="btn-link" onclick="gotoScreen('s-pm')">Kelola di Product Management →</button> agar tidak ada dua pintu untuk hal yang sama.</div>
+      <table class="grid">
+        <thead><tr><th>Kode</th><th>Kode Barang</th><th>Nama Barang</th><th class="num">Stok</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">ELK-0000013</td><td class="mono">ELK-</td><td><b>Kabel HDMI 2m</b></td><td class="num">24</td><td><span class="badge ok">Aman</span></td></tr>
+          <tr><td class="mono">BRG-0000046</td><td class="mono">BRG-</td><td><b>Lakban Hitam</b></td><td class="num">3</td><td><span class="badge off">Menipis</span></td></tr>
+        </tbody>
+      </table>
+      <div class="infobox">Kolom <b>Kode Barang</b> (baru) membantu membedakan pola kode antar baris.</div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: TRANSAKSI (placeholder existing) ============ -->
+  <section id="s-transaksi" class="screen">
+    <h1 class="title">Transaksi</h1>
+    <div class="hint">Layar existing — tidak termasuk mockup ini (tidak berubah oleh fitur Kode Barang).</div>
+    <div class="panel"><div class="infobox">Placeholder: form Catat Masuk / Catat Keluar tetap seperti sekarang.</div></div>
+  </section>
+
+  <!-- ============ GALERI STATE ============ -->
+  <section id="s-galeri" class="screen">
+    <h1 class="title">Galeri State</h1>
+    <div class="hint">Kumpulan state kosong &amp; validasi yang dipakai di mockup ini — acuan konsistensi untuk Gunet.</div>
+    <div class="galeri">
+      <div class="gcard">
+        <h4>State kosong (tabel)</h4>
+        <table class="grid"><thead><tr><th>Nama Kategori</th><th>Aksi</th></tr></thead>
+        <tbody><tr class="emptyrow"><td colspan="2">Belum ada kategori.<br>Klik <b>+ Tambah Kategori</b> untuk mulai.</td></tr></tbody></table>
+      </div>
+      <div class="gcard">
+        <h4>Peringatan validasi (kuning)</h4>
+        <div class="warnbox" style="margin:0"><b>Kategori "ATK" belum punya kode barang aktif.</b><br>Hubungkan minimal 1 kode barang di <b>Product Management → Mapping</b> sebelum kategori ini bisa dipakai.</div>
+      </div>
+      <div class="gcard">
+        <h4>Error validasi (merah)</h4>
+        <div class="errbox" style="margin:0">DITOLAK: tidak bisa melepas mapping terakhir.<br>Kategori wajib punya minimal 1 kode barang aktif.</div>
+      </div>
+      <div class="gcard">
+        <h4>Info / hint (abu)</h4>
+        <div class="infobox" style="margin:0">Kode nonaktif tidak muncul di dropdown form barang, tetapi barang lama yang memakainya tetap utuh.</div>
+      </div>
+      <div class="gcard">
+        <h4>Preview kode (biru)</h4>
+        <div class="previewbox" style="margin:0"><div class="plabel">Kode berikutnya (auto-generate, final)</div><div class="pcode">ELK-SRV-0000004</div></div>
+      </div>
+      <div class="gcard">
+        <h4>Toast sukses (amber)</h4>
+        <div class="infobox" style="margin:0">Toast muncul di bawah-tengah layar, contoh:<br><b style="color:var(--amber)">TERHUBUNG: BRG- → Pakaian</b></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- nav tambahan untuk galeri (hanya di mockup) -->
+<div style="position:fixed; bottom:14px; right:14px; z-index:60;">
+  <button class="btn btn-outline btn-small" onclick="gotoScreen('s-galeri')">Galeri State</button>
+  <button class="btn btn-outline btn-small" onclick="gotoScreen('s-barang-tambah')">Demo Form Barang</button>
+</div>
+
+<!-- ============ MODAL: tambah kategori ============ -->
+<div class="overlay" id="m-kat-tambah">
+  <div class="modal">
+    <h2>Tambah Kategori</h2>
+    <div class="hint">Kategori hanya punya nama. Setelah tersimpan, hubungkan kode barang di tab Mapping.</div>
+    <label class="flabel">Nama Kategori</label>
+    <input type="text" id="inKatNama" placeholder="cth: Minuman">
+    <div class="ferr" id="eKatNama">Nama kategori wajib diisi (1–50 karakter).</div>
+    <div class="mrow">
+      <button class="btn btn-outline" onclick="closeModal('m-kat-tambah')">Batal</button>
+      <button class="btn btn-amber" onclick="submitKat()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: tambah kode barang ============ -->
+<div class="overlay" id="m-kode-tambah">
+  <div class="modal">
+    <h2>Tambah Kode Barang</h2>
+    <div class="hint">Satu kode = satu pola penomoran (prefix + counter sendiri).</div>
+    <label class="flabel">Kode (prefix)</label>
+    <input type="text" id="inKodeKode" placeholder="cth: MNM-" style="font-family:Consolas,monospace; text-transform:uppercase;">
+    <div class="ferr" id="eKodeKode">Kode wajib: huruf besar/angka/strip, 1–10 karakter, tanpa spasi, dan belum dipakai.</div>
+    <label class="flabel">Nama Tampilan</label>
+    <input type="text" id="inKodeNama" placeholder="cth: Kode minuman">
+    <div class="ferr" id="eKodeNama">Nama wajib diisi (1–50 karakter).</div>
+    <label class="flabel">Keterangan (opsional)</label>
+    <input type="text" placeholder="cth: Untuk kategori minuman ringan">
+    <div class="mrow">
+      <button class="btn btn-outline" onclick="closeModal('m-kode-tambah')">Batal</button>
+      <button class="btn btn-amber" onclick="submitKode()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="footer-note">MOCKUP — Ventra · Menu Product Management · Prapto (UI/UX) · Assignment VO #27 · Template B</div>
+
+<script>
+/* ===== DATA CONTOH (mockup) ===== */
+const KAT = [
+  {id:1, nama:'Elektronik', jml:24, aktif:1},
+  {id:2, nama:'Pakaian',    jml:18, aktif:1},
+  {id:3, nama:'ATK',        jml:0,  aktif:1},
+  {id:4, nama:'Minuman',    jml:5,  aktif:1},
+];
+const KODE = [
+  {id:1, kode:'ELK-',     nama:'Elektronik umum',   counter:12, jml:14, aktif:1},
+  {id:2, kode:'ELK-SRV-', nama:'Elektronik servis', counter:3,  jml:10, aktif:1},
+  {id:3, kode:'BRG-',     nama:'Kode umum',         counter:45, jml:12, aktif:1},
+  {id:4, kode:'PKN-',     nama:'Pakaian',           counter:8,  jml:18, aktif:1},
+  {id:5, kode:'MNM-',     nama:'Minuman',           counter:5,  jml:5,  aktif:1},
+  {id:6, kode:'OLD-',     nama:'Kode lama',         counter:99, jml:30, aktif:0},
+];
+/* M:N fleksibel: BRG- dipakai Elektronik & Pakaian */
+let MAP = [[1,1],[1,2],[1,3],[2,3],[2,4],[4,5]];
+
+const $ = id => document.getElementById(id);
+const katById = id => KAT.find(k=>k.id===id);
+const kodeById = id => KODE.find(k=>k.id===id);
+const kodeOfKat = katId => MAP.filter(m=>m[0]===katId).map(m=>kodeById(m[1])).filter(Boolean);
+
+/* ===== NAVIGASI ===== */
+function gotoScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+  document.querySelectorAll('.navtab').forEach(t=>t.classList.toggle('active', t.dataset.screen===id));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.navtab').forEach(t=>t.addEventListener('click',()=>gotoScreen(t.dataset.screen)));
+document.querySelectorAll('.subtab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.subtab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tabpanel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); $(t.dataset.tab).classList.add('active');
+}));
+
+/* ===== TOAST & MODAL ===== */
+let toastTimer;
+function toast(msg, isErr){
+  const el=$('toast'); el.textContent=msg; el.classList.toggle('err',!!isErr); el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
+}
+function openModal(id){ $(id).classList.add('open'); }
+function closeModal(id){ $(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+
+/* ===== TAB KATEGORI ===== */
+function renderKat(filter){
+  const tb=$('tbodyKat'); tb.innerHTML='';
+  const rows=KAT.filter(k=>!filter||k.nama.toLowerCase().includes(filter.toLowerCase()));
+  if(!rows.length){ tb.innerHTML='<tr class="emptyrow"><td colspan="5">Belum ada kategori.<br>Klik <b>+ Tambah Kategori</b> untuk mulai.</td></tr>'; return; }
+  rows.forEach(k=>{
+    const ks=kodeOfKat(k.id).filter(x=>x.aktif);
+    const chips=ks.length? ks.map(x=>'<span class="chip">'+x.kode+'</span>').join('') : '<span style="color:var(--amber); font-size:12px;">⚠ belum ada kode barang</span>';
+    tb.innerHTML+='<tr><td><b>'+k.nama+'</b></td><td>'+chips+'</td><td class="num">'+k.jml+'</td>'+
+      '<td>'+(k.aktif?'<span class="badge ok">Aktif</span>':'<span class="badge off">Nonaktif</span>')+'</td>'+
+      '<td><button class="btn btn-outline btn-small" onclick="toast(\'Ubah kategori: '+k.nama+' (mockup)\')">Ubah</button> '+
+      '<button class="btn btn-danger btn-small" onclick="nonaktifKat('+k.id+')">Nonaktif</button></td></tr>';
+  });
+}
+function filterKat(v){ renderKat(v); }
+function nonaktifKat(id){
+  const k=katById(id);
+  if(k.jml>0){ toast('DITOLAK: kategori "'+k.nama+'" masih punya '+k.jml+' barang', true); return; }
+  k.aktif=0; renderKat($('searchKat').value); toast('DINONAKTIFKAN: '+k.nama);
+}
+function submitKat(){
+  const v=$('inKatNama').value.trim();
+  if(!v){ $('eKatNama').style.display='block'; return; }
+  $('eKatNama').style.display='none';
+  KAT.push({id:Math.max(...KAT.map(k=>k.id))+1, nama:v, jml:0, aktif:1});
+  closeModal('m-kat-tambah'); $('inKatNama').value='';
+  renderKat(''); $('cnt-kat').textContent=KAT.length; buildMapKat(); toast('TERSIMPAN: kategori '+v);
+}
+
+/* ===== TAB KODE BARANG ===== */
+function renderKode(filter){
+  const tb=$('tbodyKode'); tb.innerHTML='';
+  const rows=KODE.filter(k=>!filter||(k.kode+k.nama).toLowerCase().includes(filter.toLowerCase()));
+  if(!rows.length){ tb.innerHTML='<tr class="emptyrow"><td colspan="6">Belum ada kode barang.<br>Klik <b>+ Tambah Kode Barang</b> untuk mulai.</td></tr>'; return; }
+  rows.forEach(k=>{
+    tb.innerHTML+='<tr><td class="mono">'+k.kode+'</td><td><b>'+k.nama+'</b></td><td class="num">'+k.counter+'</td><td class="num">'+k.jml+'</td>'+
+      '<td>'+(k.aktif?'<span class="badge ok">Aktif</span>':'<span class="badge off">Nonaktif</span>')+'</td>'+
+      '<td><button class="btn btn-outline btn-small" onclick="toast(\'Ubah kode barang: '+k.kode+' (mockup)\')">Ubah</button> '+
+      (k.aktif?'<button class="btn btn-danger btn-small" onclick="nonaktifKode('+k.id+')">Nonaktif</button>':'')+'</td></tr>';
+  });
+}
+function filterKode(v){ renderKode(v); }
+function nonaktifKode(id){
+  const k=kodeById(id);
+  if(k.jml>0){ toast('DITOLAK: kode "'+k.kode+'" sudah dipakai '+k.jml+' barang — gunakan Nonaktif', true); return; }
+  k.aktif=0; renderKode($('searchKode').value); renderMapping(); toast('DINONAKTIFKAN: '+k.kode);
+}
+function submitKode(){
+  const kode=$('inKodeKode').value.trim().toUpperCase(), nama=$('inKodeNama').value.trim();
+  let ok=true;
+  if(!/^[A-Z0-9-]{1,10}$/.test(kode)||KODE.some(k=>k.kode===kode)){ $('eKodeKode').style.display='block'; ok=false; }
+  else $('eKodeKode').style.display='none';
+  if(!nama){ $('eKodeNama').style.display='block'; ok=false; } else $('eKodeNama').style.display='none';
+  if(!ok) return;
+  KODE.push({id:Math.max(...KODE.map(k=>k.id))+1, kode, nama, counter:0, jml:0, aktif:1});
+  closeModal('m-kode-tambah'); $('inKodeKode').value=''; $('inKodeNama').value='';
+  renderKode(''); $('cnt-kode').textContent=KODE.length; renderMapping(); toast('TERSIMPAN: kode '+kode);
+}
+
+/* ===== TAB MAPPING ===== */
+function buildMapKat(){
+  const s=$('mapKat'); const cur=s.value; s.innerHTML='';
+  KAT.filter(k=>k.aktif).forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent=k.nama; s.appendChild(o); });
+  if(cur) s.value=cur;
+}
+function renderMapping(){
+  const katId=+$('mapKat').value, conn=MAP.filter(m=>m[0]===katId).map(m=>kodeById(m[1])).filter(Boolean);
+  const connIds=new Set(conn.map(k=>k.id));
+  const avail=KODE.filter(k=>k.aktif && !connIds.has(k.id));
+  $('mapConnN').textContent='('+conn.length+')'; $('mapAvailN').textContent='('+avail.length+')';
+  $('mapConnected').innerHTML = conn.length? conn.map(k=>
+    '<div class="mapitem"><div class="meta"><span class="mono">'+k.kode+'</span> '+k.nama+'<small>'+k.jml+' barang memakai</small></div>'+
+    '<button class="btn btn-danger btn-small" onclick="lepasMap('+katId+','+k.id+')">Lepas</button></div>').join('')
+    : '<div class="infobox" style="margin:0">Belum ada kode barang terhubung.<br>Kategori ini <b>belum bisa dipakai</b> di form Tambah Barang (butuh min. 1).</div>';
+  $('mapAvailable').innerHTML = avail.length? avail.map(k=>
+    '<div class="mapitem"><div class="meta"><span class="mono">'+k.kode+'</span> '+k.nama+'<small>'+k.jml+' barang memakai</small></div>'+
+    '<button class="btn btn-outline btn-small" onclick="hubungMap('+katId+','+k.id+')">Hubungkan</button></div>').join('')
+    : '<div class="infobox" style="margin:0">Semua kode barang aktif sudah terhubung.</div>';
+  $('mapMsg').innerHTML='';
+}
+function hubungMap(katId,kodeId){
+  MAP.push([katId,kodeId]); renderMapping(); renderKat($('searchKat').value);
+  toast('TERHUBUNG: '+kodeById(kodeId).kode+' → '+katById(katId).nama);
+}
+function lepasMap(katId,kodeId){
+  const aktifConn=MAP.filter(m=>m[0]===katId && kodeById(m[1]).aktif).length;
+  if(aktifConn<=1 && kodeById(kodeId).aktif){
+    $('mapMsg').innerHTML='<div class="errbox">DITOLAK: tidak bisa melepas mapping terakhir.<br>Kategori "'+katById(katId).nama+'" wajib punya minimal 1 kode barang aktif.</div>';
+    return;
+  }
+  MAP=MAP.filter(m=>!(m[0]===katId&&m[1]===kodeId));
+  renderMapping(); renderKat($('searchKat').value);
+  toast('DILEPAS: '+kodeById(kodeId).kode+' dari '+katById(katId).nama);
+}
+
+/* ===== FORM TAMBAH BARANG ===== */
+function buildFormKat(){
+  const s=$('fKat'); s.innerHTML='<option value="">— Pilih kategori —</option>';
+  KAT.filter(k=>k.aktif).forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent=k.nama; s.appendChild(o); });
+  onFormKat();
+}
+function onFormKat(){
+  const katId=+$('fKat').value, sk=$('fKode'), w=$('fKatWarn');
+  sk.innerHTML='';
+  if(!katId){ sk.disabled=true; w.innerHTML=''; $('fPreview').textContent='—'; return; }
+  const ks=kodeOfKat(katId).filter(x=>x.aktif);
+  sk.disabled = ks.length===0;
+  if(ks.length===0){
+    w.innerHTML='<div class="warnbox"><b>Kategori "'+katById(katId).nama+'" belum punya kode barang aktif.</b><br>Hubungkan minimal 1 kode barang di <b>Product Management → Mapping</b> sebelum kategori ini bisa dipakai.</div>';
+    $('fPreview').textContent='—'; return;
+  }
+  w.innerHTML='';
+  ks.forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent=k.kode+' — '+k.nama; sk.appendChild(o); });
+  if(ks.length===1){ sk.value=ks[0].id; } /* Q3: auto-fill bila hanya 1 */
+  onFormKode();
+}
+function onFormKode(){
+  const k=kodeById(+$('fKode').value);
+  $('fPreview').textContent = k? k.kode + String(k.counter+1).padStart(7,'0') : '—';
+}
+
+/* ===== INIT ===== */
+renderKat(''); renderKode(''); buildMapKat(); renderMapping(); buildFormKat();
+</script>
+</body>
+</html>
