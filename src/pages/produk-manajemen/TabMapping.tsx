@@ -79,7 +79,9 @@ export default function TabMapping({ tampilToast }: { tampilToast: (p: string) =
         barang boleh dipakai banyak kategori. Tidak bisa melepas mapping aktif <b>terakhir</b>.
       </div>
       {kategoriId > 0 && tanpaKodeAktif && (
-        <div className="pesan-galat">
+        // QA #33-6: peringatan Q4 sebagai warnbox eksplisit (kuning), bukan
+        // kotak merah galat — ini peringatan operasional, bukan error.
+        <div className="warnbox">
           ⚠ KATEGORI "{namaKat.toUpperCase()}" BELUM PUNYA KODE BARANG AKTIF.
           <br />
           <span style={{ fontWeight: 600, fontSize: 14 }}>

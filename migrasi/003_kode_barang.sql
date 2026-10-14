@@ -8,12 +8,14 @@
 -- Berjalan otomatis sekali saat aplikasi dibuka setelah update (pola migrasi
 -- yang sama seperti 001/002 di src/lib/db-worker.ts).
 --
--- ATOMIK (QA MIG-07): seluruh skrip dalam SATU transaksi — gagal di tengah =
--- batal total, database kembali seperti semula. Bila exec melempar, worker
--- (db-worker.ts) melakukan ROLLBACK sebelum mencatat versi, sehingga retry
--- berikutnya mulai dari kondisi bersih. Backfill memakai INSERT OR IGNORE
--- (idempoten) sebagai pengaman lapis kedua.
-BEGIN IMMEDIATE;
+-- ATOMIK (QA MIG-07, #33): skrip ini dieksekusi worker (db-worker.ts,
+-- jalankanMigrasi()) di DALAM satu transaksi: BEGIN → skrip ini → catat
+-- versi → COMMIT; ROLLBACK bila gagal. Gagal di tengah = batal total,
+-- database kembali seperti semula, retry berikutnya mulai bersih.
+-- Backfill memakai INSERT OR IGNORE / IF NOT EXISTS (idempoten) sebagai
+-- pengaman lapis kedua.
+-- JANGAN tambah BEGIN/COMMIT di file ini — transaksi dikelola worker
+-- (BEGIN bersarang = no-op, COMMIT bersarang = commit prematur!).
 
 -- 1. Entitas kode barang: satu baris = satu pola kode (prefix + counter sendiri).
 CREATE TABLE IF NOT EXISTS kode_barang (
@@ -101,5 +103,3 @@ SELECT
 FROM barang b
 JOIN kategori k ON k.id = b.kategori_id
 LEFT JOIN kode_barang kb ON kb.id = b.kode_barang_id;
-
-COMMIT;
