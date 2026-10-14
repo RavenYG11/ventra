@@ -45,7 +45,10 @@ Detail lengkap: [`docs/stock-barang-mvp-v1.md`](docs/stock-barang-mvp-v1.md)
 ```
 src/            # React + TypeScript (UI, domain, lib)
   lib/
-    db.ts       # SATU-SATUNYA tempat query SQLite (via @sqlite.org/sqlite-wasm + OPFS)
+    db.ts       # SATU-SATUNYA tempat query SQLite — proxy main thread ke worker
+    db-worker.ts# Engine SQLite di Web Worker (WASM + OPFS opfs-sahpool).
+                # ATURAN: installOpfsSAHPoolVfs HANYA boleh di worker
+                # (createSyncAccessHandle tidak ada di main thread).
     backup.ts   # Unduh backup database (.db)
 migrasi/        # File migrasi SQL SQLite (skema TIDAK berubah dari edisi Tauri)
 docs/           # Spesifikasi & keputusan terkunci
@@ -80,6 +83,33 @@ tidak ada data yang keluar dari laptop. Jangan buka Ventra di dua tab bersamaan
 
 **Catatan kamera:** scan barcode memakai kamera laptop — browser meminta izin sekali.
 Jalan di `http://localhost` (dianggap secure context oleh browser).
+
+## Troubleshooting database (worker/WASM)
+
+Database Ventra berjalan di **Web Worker** (`src/lib/db-worker.ts`) memakai
+`@sqlite.org/sqlite-wasm` + VFS `opfs-sahpool` (data di OPFS browser).
+Aturan arsitektur: `installOpfsSAHPoolVfs` **hanya boleh dipanggil di dalam worker**
+(`createSyncAccessHandle` tidak tersedia di main thread Chrome) — jangan pindahkan
+kembali ke `db.ts`. File `db.ts` hanyalah proxy via `postMessage`.
+
+**Kode error (diawali `VDB-` atau `[FASE]`):**
+
+| Kode | Arti | Tindakan |
+|------|------|----------|
+| `VDB-W01` | Worker crash saat load modul (import/bundling gagal). Detail: pesan, file, baris, kolom | Klik **Salin detail teknis**, kirim ke tim |
+| `VDB-W02` | Error runtime tak tertangkap di dalam worker | Klik **Salin detail teknis**, kirim ke tim |
+| `VDB-W03` | Inisialisasi melebihi 15 detik (timeout) | Muat ulang; bila tetap, tutup semua tab Ventra |
+| `[WASM_LOAD_FAILED]` | `sqlite3.wasm` gagal dimuat (URL kosong/404) | `npm install` ulang; pastikan `dist/sqlite3.wasm` ada setelah build |
+| `[OPFS_UNAVAILABLE]` | OPFS tidak bisa dibaca/ditulis (private mode, profil rusak, disk penuh) | Pakai window normal (bukan incognito); cek ruang disk |
+| `[VFS_INSTALL_FAILED]` | Install VFS gagal | Lihat detail teknis |
+| `[DB_OPEN_FAILED]` | File database terkunci (kemungkinan dua tab) | Tutup semua tab Ventra, buka satu tab baru |
+| `[MIGRATION_FAILED]` | Migrasi skema gagal | Lihat detail teknis; jangan hapus data manual |
+
+**Alur diagnosis bila layar menampilkan galat database:**
+
+1. Klik **Salin detail teknis** → tempel ke laporan/chat.
+2. Buka DevTools → tab **Console** → salin teks merah (`Uncaught ...`) bila ada.
+3. Jangan buka Ventra di dua tab bersamaan (satu file database = satu koneksi).
 
 ## Verifikasi sebelum dinyatakan selesai
 

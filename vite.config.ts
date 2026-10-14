@@ -16,4 +16,9 @@ export default defineConfig({
   // yang dipakai Ventra tidak mewajibkannya
   // (sqlite.org/wasm/doc/trunk/persistence.md), dan COEP require-corp
   // berisiko memblokir pemuatan sqlite3.wasm di dev server.
+  worker: {
+    // Format ES module untuk Web Worker database (src/lib/db-worker.ts) —
+    // pola resmi Vite untuk `new Worker(new URL('./x.ts', import.meta.url))`.
+    format: 'es',
+  },
 });

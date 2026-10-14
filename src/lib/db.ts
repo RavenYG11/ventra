@@ -15,6 +15,12 @@
 // Worker); file ini HANYA proxy via postMessage. Jangan pindahkan pemanggilan
 // installOpfsSAHPoolVfs / OpfsSAHPoolDb kembali ke main thread.
 //
+// INSTRUMENTASI (assignment #22, 2026-10-14 — STOP-RULE meeting #3: dilarang
+// fix buta tanpa bukti): worker.onerror mencatat SEMUA field ErrorEvent +
+// kode stabil VDB-W01 (tanpa fallback "kesalahan tidak dikenal"); worker
+// melaporkan diagnostik internal via pesan {id:-1} (VDB-W02); tersedia
+// salinDetailTeknis() untuk tombol "Salin detail teknis" di layar galat.
+//
 // Sumber:
 // - https://sqlite.org/wasm/doc/trunk/persistence.md ("OPFS SyncAccessHandle Pool VFS")
 // - https://github.com/sqlite/sqlite-wasm (demos/sahpool-demo: main thread
@@ -46,6 +52,47 @@ export interface DbVentra {
 }
 
 // ---------------------------------------------------------------------------
+// Detail teknis galat — untuk tombol "Salin detail teknis".
+// ---------------------------------------------------------------------------
+
+/** Detail teknis galat init terakhir (kode VDB-*, fase, pesan asli). */
+let detailTeknisTerakhir = '';
+
+function catatDetailTeknis(teks: string): void {
+  detailTeknisTerakhir = teks;
+}
+
+/**
+ * Salin detail teknis galat terakhir ke clipboard.
+ * Dipakai tombol "Salin detail teknis" di panel galat (LoginPage).
+ * Mengembalikan true bila berhasil disalin.
+ */
+export function salinDetailTeknis(): Promise<boolean> {
+  const teks = detailTeknisTerakhir || '(belum ada detail teknis tercatat)';
+  try {
+    const cb = (navigator as unknown as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard;
+    if (cb && typeof cb.writeText === 'function') {
+      return cb.writeText(teks).then(
+        () => true,
+        () => false
+      );
+    }
+    // Fallback untuk browser/konteks tanpa navigator.clipboard.
+    const area = document.createElement('textarea');
+    area.value = teks;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(area);
+    return Promise.resolve(ok);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Proxy ke worker.
 // ---------------------------------------------------------------------------
 
@@ -58,6 +105,7 @@ interface BalasanWorker {
   id: number;
   ok: boolean;
   error?: string;
+  fase?: string;
   rows?: unknown[];
   lastInsertId?: number;
   bytes?: Uint8Array;
@@ -72,13 +120,37 @@ let janjiInisialisasi: Promise<DbVentra> | null = null;
 // reject), jangan biarkan aplikasi stuck selamanya di layar "Memuat…".
 const BATAS_WAKTU_INIT_MS = 15000;
 
+/** Hentikan worker paksa + reset state agar retry mulai dari keadaan bersih. */
+function resetWorker(): void {
+  try {
+    worker?.terminate();
+  } catch {
+    // Abaikan — worker mungkin sudah mati.
+  }
+  worker = null;
+  janjiInisialisasi = null;
+  const galat = new Error('[VDB-W03] Inisialisasi dibatalkan (timeout/reset worker).');
+  for (const tugas of pending.values()) tugas.gagal(galat);
+  pending.clear();
+}
+
 function dapatkanWorker(): Worker {
   if (!worker) {
-    // Vite mem-bundle './db-worker.ts' sebagai chunk worker terpisah.
+    // Pola resmi Vite: literal statis new URL('./db-worker.ts', import.meta.url).
+    // Jangan diganti string dinamis — bundler tidak akan memprosesnya.
     worker = new Worker(new URL('./db-worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (ev: MessageEvent<BalasanWorker>) => {
       const m = ev.data;
       if (!m || typeof m.id !== 'number') return;
+      if (m.id === -1) {
+        // Diagnostik fatal dari DALAM worker (self.onerror / onunhandledrejection).
+        const kode = typeof m.fase === 'string' && m.fase ? '[' + m.fase + '] ' : '';
+        const galat = new Error('[VDB-W02] ' + kode + (m.error ?? 'Worker melaporkan kegagalan tanpa detail.'));
+        catatDetailTeknis(galat.message);
+        for (const tugas of pending.values()) tugas.gagal(galat);
+        pending.clear();
+        return;
+      }
       const tugas = pending.get(m.id);
       if (!tugas) return;
       pending.delete(m.id);
@@ -86,12 +158,19 @@ function dapatkanWorker(): Worker {
       else tugas.gagal(new Error(typeof m.error === 'string' ? m.error : 'Worker database gagal.'));
     };
     worker.onerror = (ev: ErrorEvent) => {
-      // Worker crash: gagalkan semua pemanggil yang sedang menunggu.
-      const galat = new Error(
-        'Worker database berhenti: ' + (ev.message || 'kesalahan tidak dikenal') + '. Muat ulang halaman.'
-      );
+      // Fase construct/load worker: ambil SEMUA field ErrorEvent.
+      // SENGAJA tanpa fallback "kesalahan tidak dikenal" — bukti dulu, baru fix.
+      const detail =
+        'pesan="' + (ev.message || '(kosong)') + '" ' +
+        'file=' + (ev.filename || '(tidak diketahui)') + ' ' +
+        'baris=' + (ev.lineno ?? '?') + ' ' +
+        'kolom=' + (ev.colno ?? '?');
+      const galat = new Error('[VDB-W01] Worker database berhenti (' + detail + '). Muat ulang halaman.');
+      catatDetailTeknis(galat.message);
       for (const tugas of pending.values()) tugas.gagal(galat);
       pending.clear();
+      // Reset agar tombol Muat Ulang bisa retry tanpa reload penuh.
+      resetWorker();
     };
   }
   return worker;
@@ -129,20 +208,19 @@ async function inisialisasiDenganBatasWaktu(): Promise<DbVentra> {
       panggil<{ ok: boolean }>('init').catch((e: unknown) => {
         // Sertakan error asli worker + saran akurat (tab lain vs OPFS diblokir).
         const sebab = e instanceof Error ? e.message : String(e);
+        catatDetailTeknis('[init] ' + sebab);
         throw new Error('Gagal membuka database: ' + sebab + saranTabLain());
       }),
       new Promise<never>((_, tolak) => {
-        timer = setTimeout(
-          () =>
-            tolak(
-              new Error(
-                'Inisialisasi database melebihi 15 detik — kemungkinan worker/penyimpanan ' +
-                  'browser (OPFS) macet. Muat ulang halaman; bila tetap gagal, ' +
-                  'tutup semua tab Ventra lalu buka satu tab baru.'
-              )
-            ),
-          BATAS_WAKTU_INIT_MS
-        );
+        timer = setTimeout(() => {
+          resetWorker();
+          const pesan =
+            '[VDB-W03] Inisialisasi database melebihi 15 detik — kemungkinan worker/penyimpanan ' +
+            'browser (OPFS) macet. Muat ulang halaman; bila tetap gagal, ' +
+            'tutup semua tab Ventra lalu buka satu tab baru.';
+          catatDetailTeknis(pesan);
+          tolak(new Error(pesan));
+        }, BATAS_WAKTU_INIT_MS);
       }),
     ]);
   } finally {

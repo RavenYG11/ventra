@@ -9,6 +9,14 @@
 // main thread HANYA me-spawn worker; worker yang install VFS + buka DB.
 // Memanggil installOpfsSAHPoolVfs di main thread = gagal pasti.
 //
+// INSTRUMENTASI (assignment #22, 2026-10-14 — STOP-RULE meeting #3: dilarang
+// fix buta tanpa bukti): tiap tahap initDb() berlabel fase
+// (WASM_LOAD_FAILED / OPFS_UNAVAILABLE / VFS_INSTALL_FAILED / DB_OPEN_FAILED /
+// MIGRATION_FAILED); self.onerror + self.onunhandledrejection melaporkan ke
+// main thread via {id:-1}; guard pastikanOpfsBisaDitulis() memastikan OPFS
+// bisa ditulis SEBELUM install VFS (anti-wipe: init VFS yang gagal bisa
+// me-wipe storage bila tanpa preserveOnInitFailure).
+//
 // Pola komunikasi: main thread (lib/db.ts) mengirim {id, op, sql?, params?}
 // via postMessage; worker membalas {id, ok:true, ...hasil} atau
 // {id, ok:false, error}. Semua byte database ditransfer (bukan di-copy)
@@ -58,19 +66,131 @@ const NAMA_FILE_DB = '/stok.db';
 let pool: PoolUtil | null = null;
 let db: DbWasm | null = null;
 
-/** Inisialisasi engine: WASM → VFS OPFS → buka DB → migrasi. Idempoten. */
+// ---------------------------------------------------------------------------
+// Diagnostik: tangkap error runtime yang lolos dari handler pesan.
+// (Catatan jujur: bila 4 static import di atas gagal, modul tidak pernah
+// dievaluasi sehingga handler ini tidak terpasang — kasus itu ditangkap
+// worker.onerror di main thread sebagai VDB-W01.)
+// ---------------------------------------------------------------------------
+
+self.onerror = (ev: Event) => {
+  const pesan = ev instanceof ErrorEvent ? ev.message || '(kosong)' : String(ev);
+  try {
+    self.postMessage({
+      id: -1,
+      ok: false,
+      fase: 'WORKER_RUNTIME_ERROR',
+      error: '[WORKER_RUNTIME_ERROR] ' + pesan,
+    });
+  } catch {
+    // Abaikan — tidak ada lagi jalur pelaporan.
+  }
+};
+
+self.onunhandledrejection = (ev: PromiseRejectionEvent) => {
+  const r = ev.reason;
+  const pesan = r instanceof Error ? r.message : String(r);
+  try {
+    self.postMessage({
+      id: -1,
+      ok: false,
+      fase: 'WORKER_UNHANDLED_REJECTION',
+      error: '[WORKER_UNHANDLED_REJECTION] ' + pesan,
+    });
+  } catch {
+    // Abaikan — tidak ada lagi jalur pelaporan.
+  }
+};
+
+/** Bungkus error tiap fase init dengan kode stabil agar bisa didiagnosis. */
+function galatFase(kode: string, e: unknown): Error {
+  const sebab = e instanceof Error ? e.message : String(e);
+  return new Error('[' + kode + '] ' + sebab);
+}
+
+/**
+ * GUARD ANTI-WIPE: pastikan OPFS bisa dibaca & ditulis SEBELUM install VFS.
+ * Alasan: bila installOpfsSAHPoolVfs() gagal, perilaku default paket =
+ * removeVfs() (wipe storage). Guard ini memastikan VFS tidak disentuh sama
+ * sekali bila OPFS memang tidak tersedia/terblokir — jadi tidak ada risiko
+ * data terhapus oleh percobaan init yang gagal.
+ */
+async function pastikanOpfsBisaDitulis(): Promise<void> {
+  // Cast defensif: hindari ketergantungan pada versi tepat lib TS worker.
+  const nav = navigator as unknown as {
+    storage?: { getDirectory?: () => Promise<unknown> };
+  };
+  const storage = nav.storage;
+  if (!storage || typeof storage.getDirectory !== 'function') {
+    throw new Error('navigator.storage.getDirectory tidak tersedia di worker ini.');
+  }
+  const root = (await storage.getDirectory()) as {
+    getFileHandle: (
+      nama: string,
+      opsi?: { create?: boolean }
+    ) => Promise<{
+      createSyncAccessHandle: () => Promise<{
+        write: (data: Uint8Array, opsi?: { at?: number }) => number;
+        truncate: (ukuran: number) => void;
+        close: () => Promise<void>;
+      }>;
+    }>;
+    removeEntry: (nama: string) => Promise<void>;
+  };
+  const namaUji = '.ventra-uji-tulis';
+  let tutup: (() => Promise<void>) | null = null;
+  try {
+    const fh = await root.getFileHandle(namaUji, { create: true });
+    const sah = await fh.createSyncAccessHandle();
+    tutup = () => sah.close();
+    const data = new TextEncoder().encode('ventra-ok');
+    const n = sah.write(data, { at: 0 });
+    if (n !== data.length) throw new Error('Tulis uji OPFS tidak lengkap.');
+    sah.truncate(data.length);
+  } finally {
+    if (tutup) {
+      try {
+        await tutup();
+      } catch {
+        // Abaikan — file uji tetap dihapus di bawah.
+      }
+    }
+    try {
+      await root.removeEntry(namaUji);
+    } catch {
+      // Abaikan — file uji kecil, tidak mengganggu.
+    }
+  }
+}
+
+/** Inisialisasi engine: WASM → guard OPFS → VFS → buka DB → migrasi. Idempoten. */
 async function initDb(): Promise<void> {
   if (db) return;
-  // 1. Muat engine SQLite (WASM). locateFile memberi tahu Emscripten di mana
-  //    sqlite3.wasm berada setelah di-bundle Vite.
-  const sqlite3 = await muatSqlite3({
-    locateFile: (nama) => (nama === 'sqlite3.wasm' ? urlWasm : nama),
-  });
 
-  // 2. Aktifkan VFS opfs-sahpool. BERHASIL karena worker memiliki
-  //    createSyncAccessHandle (alasan file ini ada).
+  // FASE 1 — muat engine SQLite (WASM).
+  let sqlite3: Sqlite3Api;
+  try {
+    if (!urlWasm) {
+      throw new Error('URL sqlite3.wasm kosong — bundler tidak menyertakan file WASM (cek pola ?url).');
+    }
+    sqlite3 = await muatSqlite3({
+      locateFile: (nama) => (nama === 'sqlite3.wasm' ? urlWasm : nama),
+    });
+  } catch (e) {
+    throw galatFase('WASM_LOAD_FAILED', e);
+  }
+
+  // FASE 1b — guard OPFS (anti-wipe): jangan sentuh VFS bila OPFS buntu.
+  try {
+    await pastikanOpfsBisaDitulis();
+  } catch (e) {
+    throw galatFase('OPFS_UNAVAILABLE', e);
+  }
+
+  // FASE 2 — aktifkan VFS opfs-sahpool. BERHASIL karena worker memiliki
+  // createSyncAccessHandle (alasan file ini ada).
   if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function') {
-    throw new Error('Browser ini tidak mendukung penyimpanan database lokal (OPFS).');
+    throw galatFase('VFS_INSTALL_FAILED', 'installOpfsSAHPoolVfs bukan fungsi pada objek sqlite3.');
   }
   // CATATAN: opsi `preserveOnInitFailure` (anti-wipe storage saat init gagal)
   // baru didukung sqlite-wasm 3.54; di 3.53.4 flag ini diabaikan dengan aman.
@@ -78,17 +198,25 @@ async function initDb(): Promise<void> {
   try {
     pool = await sqlite3.installOpfsSAHPoolVfs({ preserveOnInitFailure: true });
   } catch (e) {
-    const sebab = e instanceof Error ? e.message : String(e);
-    throw new Error('Gagal membuka database lokal (' + sebab + ').');
+    throw galatFase('VFS_INSTALL_FAILED', e);
   }
 
-  // 3. Buka (atau buat) database + jalankan migrasi.
+  // FASE 3 — buka (atau buat) database.
   try {
-    db = new pool.OpfsSAHPoolDb(NAMA_FILE_DB);
-    jalankanMigrasi(db);
+    const p = pool;
+    if (!p) throw new Error('Pool VFS null setelah install.');
+    db = new p.OpfsSAHPoolDb(NAMA_FILE_DB);
   } catch (e) {
-    const sebab = e instanceof Error ? e.message : String(e);
-    throw new Error('Gagal menyiapkan database (' + sebab + ').');
+    throw galatFase('DB_OPEN_FAILED', e);
+  }
+
+  // FASE 4 — jalankan migrasi skema.
+  try {
+    const koneksi = db;
+    if (!koneksi) throw new Error('Koneksi null sebelum migrasi.');
+    jalankanMigrasi(koneksi);
+  } catch (e) {
+    throw galatFase('MIGRATION_FAILED', e);
   }
 }
 

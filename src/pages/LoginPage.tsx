@@ -9,6 +9,7 @@ import {
   masuk,
   setelUlangKataSandi,
 } from '../features/pengguna/service-login';
+import { salinDetailTeknis } from '../lib/db';
 
 type Mode = 'memuat' | 'setup' | 'login' | 'lupa' | 'reset';
 
@@ -20,6 +21,7 @@ export default function LoginPage({ onMasuk }: { onMasuk: (nama: string) => void
   const [galat, setGalat] = useState<string | null>(null);
   const [sukses, setSukses] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
+  const [tersalin, setTersalin] = useState(false);
 
   useEffect(() => {
     apakahButuhSetupAwal()
@@ -110,8 +112,16 @@ export default function LoginPage({ onMasuk }: { onMasuk: (nama: string) => void
           {galat ? (
             <>
               <PesanGalat pesan={galat} />
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'center' }}>
                 <Tombol onClick={() => window.location.reload()}>Muat ulang</Tombol>
+                <Tombol
+                  onClick={async () => {
+                    const ok = await salinDetailTeknis();
+                    setTersalin(ok);
+                  }}
+                >
+                  {tersalin ? 'Tersalin!' : 'Salin detail teknis'}
+                </Tombol>
               </div>
             </>
           ) : (
