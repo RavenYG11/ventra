@@ -1,5 +1,51 @@
 # Progress Build — Ventra v0.1
 
+## [2026-10-14] v0.1 — PIVOT WEB: hapus Tauri, SQLite via WASM + OPFS (assignment #18)
+- Selesai (keputusan Rama: tanpa install Rust — Tauri/desktop DIBATALKAN):
+  - `src-tauri/` dihapus total dari repo (5 file: `src/main.rs`, `tauri.conf.json`,
+    `Cargo.toml`, `build.rs`, `capabilities/default.json`).
+  - `package.json`: dependensi `@tauri-apps/*` (api, plugin-sql, cli) dihapus;
+    script `tauri` & `build:all` dihapus; tambah `@sqlite.org/sqlite-wasm`
+    (pin eksak `3.53.4-build2`).
+  - `src/lib/db.ts` ditulis ulang: SQLite sebagai WASM di browser, persisten di
+    OPFS via VFS resmi `opfs-sahpool` (`installOpfsSAHPoolVfs()` →
+    `poolUtil.OpfsSAHPoolDb('/stok.db')`); antarmuka `select<T>/execute` dengan
+    placeholder `$1` dipertahankan (dinormalisasi ke `?1` di adapter) sehingga
+    repo-*.ts TIDAK berubah; skema DB & migrasi 001+002 TIDAK berubah; file
+    `sqlite3.wasm` diserve via `?url` + `locateFile` (pola bundler resmi).
+  - Backup: mekanisme "otomatis saat aplikasi ditutup" DIGANTI tombol
+    **"Unduh Backup"** (toolbar Daftar Barang) → `src/lib/backup.ts`:
+    `poolUtil.exportFile()` → file `ventra-backup-YYYYMMDD-HHMMSS.db` ke folder
+    Download. Alasan: browser memblokir download saat tab ditutup.
+  - `vite.config.ts`: `base: './'` (bisa diserve dari subpath XAMPP
+    `http://localhost/ventra`); header COOP/COEP di dev server (mengikuti demo
+    resmi; tidak wajib untuk opfs-sahpool).
+  - Nol sisa `@tauri-apps` di `src/` (hanya `src/lib/db.ts` yang memakai import
+    itu; komentar lama di `repo-barang.ts` disesuaikan dengan koneksi tunggal
+    main-thread). `@zxing/browser` & `bcryptjs` jalan native di browser.
+  - `.gitignore`: seksi Tauri/Rust dihapus.
+  - Docs ikut update (aturan realtime): README (cara jalan web + deploy XAMPP),
+    `docs/tech-stack.md` (arsitektur web), `docs/stock-barang-mvp-v1.md`
+    (backup manual, tanpa `.exe`), `docs/pendekatan-teknis-gunet.md` (revisi
+    pivot), `docs/PROGRESS.md` (entri ini).
+- Test: review kode manual per file + verifikasi silang ke dokumentasi resmi
+  sqlite-wasm (`sqlite.org/wasm/doc/trunk/persistence.md` — VFS opfs-sahpool:
+  tanpa COOP/COEP, path absolut, `exportFile`; pola init demo resmi
+  `github.com/sqlite/sqlite-wasm`).
+  BELUM compile — tidak ada toolchain di VM ini.
+- Kendala / catatan jujur:
+  1. `npm install` + `npm run build` BELUM pernah jalan — wajib sebagai langkah
+     spike di laptop dev/Rama: pastikan `sqlite3.wasm` ikut ter-bundle ke
+     `dist/`, lalu deploy ke XAMPP dan uji di `http://localhost/ventra`
+     (setup akun → tambah barang → reload = data persist → Unduh Backup).
+  2. Pola `locateFile` + `?url` mengikuti kode sumber resmi paket
+     (`dist/index.mjs` → `findWasmBinary()`), tapi belum teruji di build nyata.
+  3. Jangan buka Ventra di dua tab bersamaan (satu file OPFS = satu koneksi) —
+     tab kedua mendapat pesan galat yang jelas, bukan corrupt.
+  4. Versi `@sqlite.org/sqlite-wasm` di-pin eksak (`3.53.4-build2`, Okt 2026).
+- Berikutnya: spike install & uji jalan di laptop Rama → v0.2 (transaksi stok
+  masuk/keluar + dashboard + tolak stok negatif; fitur restore backup).
+
 ## [2026-10-14] v0.1 — review & perbaikan Gunet (atomicity + kepatuhan spec)
 - Selesai:
   - `tambahBarangAtomik` ditulis ulang: SATU statement SQL (CTE: UPDATE counter

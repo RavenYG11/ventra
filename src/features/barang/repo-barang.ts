@@ -40,13 +40,13 @@ export async function ambilBarang(id: number): Promise<Barang | null> {
  * Mengembalikan kode yang ter-generate.
  *
  * KENAPA SATU STATEMENT (bukan BEGIN/COMMIT terpisah)?
- * @tauri-apps/plugin-sql mengeksekusi setiap execute()/select() pada koneksi
- * yang diambil dari connection pool — BEGIN, INSERT, dan COMMIT yang dikirim
- * lewat beberapa panggilan terpisah TIDAK dijamin mendarat di koneksi yang
- * sama (keterbatasan resmi plugin: tauri-apps/plugins-workspace#886).
- * Satu statement = satu koneksi pool = atomik menurut jaminan SQLite sendiri.
- * Pola ini dipakai untuk semua tulis multi-tabel di Ventra (lihat v0.2:
- * transaksi stok memakai pola CTE yang sama).
+ * Edisi WEB memakai SATU koneksi SQLite di main thread (lihat lib/db.ts) —
+ * tidak ada connection pool seperti di edisi Tauri dulu, jadi BEGIN/COMMIT
+ * lewat beberapa panggilan terpisah pun sebenarnya aman. Pola satu statement
+ * tetap dipertahankan karena: (1) atomik menurut jaminan SQLite sendiri tanpa
+ * bergantung pada perilaku koneksi; (2) pola yang sama dipakai untuk semua
+ * tulis multi-tabel di Ventra (lihat v0.2: transaksi stok memakai pola CTE
+ * yang sama); (3) satu round-trip = lebih cepat.
  *
  * Alur di dalam CTE (semua terjadi atomik):
  *  1. kategori_dinaikkan — UPDATE counter kategori (+1) secara atomik;

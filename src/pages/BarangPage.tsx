@@ -11,6 +11,7 @@ import {
   suntingBarang,
   tambahBarangBaru,
 } from '../features/barang/service-barang';
+import { unduhBackup } from '../lib/backup';
 import KelolaKategori from './KelolaKategori';
 
 interface FormBarang {
@@ -158,6 +159,18 @@ export default function BarangPage({
     await muat();
   }
 
+  // Unduh salinan penuh database (.db) — pengganti backup otomatis
+  // saat aplikasi ditutup (tidak mungkin di browser). File tersimpan di
+  // folder Download; pindahkan ke flashdisk/tempat aman bila perlu.
+  async function backupSekarang() {
+    try {
+      const namaFile = await unduhBackup();
+      tampilToast(`BACKUP TERUNDUH: ${namaFile}`);
+    } catch {
+      setGalat('Gagal mengunduh backup. Coba tutup tab Ventra lain lalu ulangi.');
+    }
+  }
+
   return (
     <div className="layar">
       <h2 className="judul-layar">Daftar Barang</h2>
@@ -170,6 +183,9 @@ export default function BarangPage({
           placeholder="CARI: nama / kode / barcode…"
         />
         <span style={{ flex: 1 }} />
+        <Tombol varian="outline" onClick={backupSekarang} title="Unduh salinan database (.db)">
+          Unduh Backup
+        </Tombol>
         <Tombol varian="outline" onClick={() => setShowKategori(true)}>
           Kategori
         </Tombol>

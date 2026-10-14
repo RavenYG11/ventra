@@ -1,20 +1,23 @@
 # Ventra
 
-Aplikasi **stock barang sederhana** — desktop, 100% offline, data lokal di laptop.
+Aplikasi **stock barang sederhana** — web, 100% offline, data lokal di browser.
 Dibangun oleh tim Virtual Office untuk Rama.
 
 **Status (14 Okt 2026):** Spesifikasi MVP v1 **FINAL** (27 keputusan terkunci, tidak ada
-pertanyaan terbuka). Build kode **v0.1 SELESAI** — scaffold Tauri + React + SQLite,
-database + migrasi, login satu akun, master barang + kategori CRUD (kode otomatis),
-layar login / daftar barang / kelola kategori ala Template B.
+pertanyaan terbuka). Build kode **v0.1 SELESAI** — edisi **WEB MURNI** (pivot dari Tauri
+atas keputusan Rama 14 Okt 2026: tanpa install Rust, tanpa `.exe`): React + Vite +
+SQLite-WASM, database + migrasi, login satu akun, master barang + kategori CRUD
+(kode otomatis), layar login / daftar barang / kelola kategori ala Template B.
 
 ## Tech stack
 
-- **Tauri 2 + TypeScript + React (Vite)** — aplikasi desktop Windows, installer ±15 MB
-- **SQLite** — database satu file lokal (`stok.db`), tanpa server
+- **TypeScript + React (Vite)** — aplikasi web murni, hasil build = file statis (`dist/`)
+- **SQLite via WebAssembly** (`@sqlite.org/sqlite-wasm`) — database lokal di browser,
+  persisten di **OPFS** (Origin-Private FileSystem), tanpa server
 - Barcode: generate Code128 per item (**jsbarcode**, tampil di UI) + scan via kamera laptop (**@zxing/browser**)
 - Export laporan: Excel (**SheetJS**) & PDF (**jsPDF**)
-- Backup otomatis lokal setiap aplikasi ditutup (retensi 7 hari)
+- Backup manual: tombol **"Unduh Backup"** → file `.db` tersimpan di folder Download
+  (pengganti backup otomatis saat aplikasi ditutup — browser memblokir download saat tab ditutup)
 
 ## Fitur MVP (F1–F10)
 
@@ -29,42 +32,71 @@ Detail lengkap: [`docs/stock-barang-mvp-v1.md`](docs/stock-barang-mvp-v1.md)
 
 | File | Isi |
 |------|-----|
-| `docs/stock-barang-mvp-v1.md` | Spesifikasi MVP final — 27 keputusan terkunci, fitur, acceptance criteria |
-| `docs/tech-stack.md` | Rincian tech stack + alasan tiap pilihan (Sentot) |
+| `docs/stock-barang-mvp-v1.md` | Spesifikasi MVP final — 27 keputusan terkunci (+ revisi pivot web), fitur, acceptance criteria |
+| `docs/tech-stack.md` | Rincian tech stack edisi web + alasan tiap pilihan (Sentot) |
 | `docs/model-data.md` | Model data: tabel, SQL, validasi, contoh & kasus batas (Broto) |
 | `docs/pendekatan-teknis-gunet.md` | Pendekatan teknis & rencana build v0.1 → v1.0 (Gunet) |
 | `docs/desain-template-b.md` | Token desain Template B untuk implementasi (Prapto) |
 | `docs/mvp-ventra.md` | Snapshot spesifikasi awal |
+| `docs/PROGRESS.md` | Log progres build per tanggal |
 
 ## Struktur
 
 ```
 src/            # React + TypeScript (UI, domain, lib)
-src-tauri/      # Konfigurasi Tauri + Rust minimal
-migrasi/        # File migrasi SQL SQLite
+  lib/
+    db.ts       # SATU-SATUNYA tempat query SQLite (via @sqlite.org/sqlite-wasm + OPFS)
+    backup.ts   # Unduh backup database (.db)
+migrasi/        # File migrasi SQL SQLite (skema TIDAK berubah dari edisi Tauri)
 docs/           # Spesifikasi & keputusan terkunci
 ```
 
 ## Cara menjalankan (development)
 
-**Kebutuhan:** Windows 10/11 64-bit, Node.js 18+, Rust (via [rustup](https://rustup.rs)).
+**Kebutuhan:** Node.js 18+ (tidak perlu Rust, tidak perlu XAMPP untuk dev).
 
 1. `git clone https://github.com/RavenYG11/ventra && cd ventra`
 2. `npm install`
-3. `npm run tauri dev` — aplikasi jalan dalam mode development
+3. `npm run dev` — aplikasi jalan di browser (biasanya http://localhost:5173)
 
-**Build installer (.exe):** `npm run build:all` → hasil di `src-tauri/target/release/bundle/`
+## Cara menjalankan versi produksi (di laptop Rama)
 
-**Catatan:** kode v0.1 sudah ditulis dan direview, tapi **belum diverifikasi compile**
-(tidak ada toolchain Node/Rust di mesin build) — wajib spike `npm install` +
-`npm run tauri dev` di laptop dev/Rama sebelum v0.1 dinyatakan selesai final.
-Ikon aplikasi (`src-tauri/icons/`) belum ada — wajib diisi sebelum packaging.
+Aplikasi ini berupa file web statis yang diserve Apache XAMPP — **tanpa install apa pun** di laptop Rama selain XAMPP yang sudah umum dipakai.
+
+**Kebutuhan:** XAMPP (Apache) + browser modern (Chrome/Edge terbaru).
+
+1. Di mesin build: `npm run build` → hasil di folder `dist/`
+2. Salin **isi** folder `dist/` ke `C:\xampp\htdocs\ventra\`
+   (sehingga `C:\xampp\htdocs\ventra\index.html` ada)
+3. Buka **XAMPP Control Panel** → **Start** Apache
+4. Buka browser: **http://localhost/ventra**
+5. **Setup pertama:** buat username + password → selesai. (Tidak ada kode pemulihan —
+   reset password via username-check → unrestricted.)
+
+**Catatan data:** database tersimpan di **OPFS browser** (penyimpanan privat per origin
+`http://localhost`), bukan file yang terlihat di Explorer. Tetap 100% lokal & offline —
+tidak ada data yang keluar dari laptop. Jangan buka Ventra di dua tab bersamaan
+(satu file database = satu koneksi). Backup rutin via tombol **"Unduh Backup"**.
+
+**Catatan kamera:** scan barcode memakai kamera laptop — browser meminta izin sekali.
+Jalan di `http://localhost` (dianggap secure context oleh browser).
+
+## Verifikasi sebelum dinyatakan selesai
+
+Kode v0.1 edisi web sudah ditulis dan direview, tapi **belum diverifikasi compile**
+(tidak ada toolchain di mesin build) — wajib spike di laptop dev/Rama:
+
+1. `npm install` (pastikan `@sqlite.org/sqlite-wasm` terunduh utuh)
+2. `npm run build` (pastikan `tsc` lolos + `dist/` terbentuk, termasuk `sqlite3.wasm`)
+3. Copy `dist/` → `C:\xampp\htdocs\ventra`, start Apache, buka http://localhost/ventra
+4. Uji: setup akun → login → tambah kategori → tambah barang (kode auto-generate) →
+   muat ulang halaman (data tetap ada = OPFS jalan) → **Unduh Backup** (file .db terunduh)
 
 ## Keputusan terkunci (ringkas)
 
 Satu akun + login (tanpa peran) · satuan pcs · tanpa multi-gudang ·
-offline lokal · barcode per item (display-only, tanpa printer) · scan via kamera ·
-stok tidak boleh negatif · harga beli & jual manual, margin & nilai stok otomatis
-(nilai stok = stok × harga beli) · laporan Excel & PDF · indikator visual stok menipis ·
-reset password tanpa password lama · backup otomatis saat aplikasi ditutup (7 hari) ·
-internal only, tanpa integrasi.
+offline lokal (web, tanpa server) · barcode per item (display-only, tanpa printer) ·
+scan via kamera · stok tidak boleh negatif · harga beli & jual manual, margin & nilai
+stok otomatis (nilai stok = stok × harga beli) · laporan Excel & PDF ·
+indikator visual stok menipis · reset password tanpa password lama ·
+backup manual via tombol "Unduh Backup" (file .db) · internal only, tanpa integrasi.

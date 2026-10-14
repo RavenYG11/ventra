@@ -1,8 +1,11 @@
-# Pendekatan Teknis + Rencana Build — Ventra (Aplikasi Stock Barang Desktop Offline)
+# Pendekatan Teknis + Rencana Build — Ventra (Aplikasi Stock Barang Web Offline)
 
 **Disusun oleh:** Gunet (Software Engineer)
 **Tanggal:** 2026-10-14
-**Revisi:** 2026-10-14 (Assignment #10) — disesuaikan dengan 6 jawaban final Rama
+**Revisi:** 2026-10-14 (Assignment #10) — disesuaikan dengan 6 jawaban final Rama;
+**2026-10-14 (Assignment #18) — PIVOT WEB: Tauri/desktop DIBATALKAN** (keputusan Rama:
+tanpa install Rust). Aplikasi menjadi web murni: React + Vite + SQLite-WASM
+(`@sqlite.org/sqlite-wasm`, persistensi OPFS), diserve XAMPP (`http://localhost/ventra`).
 **Status:** Draf rencana — 6 keputusan build terkunci (lihat bagian 1, poin 5); masih menunggu konvergensi tech stack Sentot (Meeting #2) untuk keputusan bahasa/framework & library
 **Dokumen terkait:** Meeting #1 (spesifikasi MVP & 18 jawaban final Rama), Meeting #2 (konvergensi tech stack — sedang berjalan)
 
@@ -19,12 +22,13 @@ Pendekatan ini dibangun di atas keputusan yang sudah dikunci, BUKAN asumsi:
 5. **6 jawaban final Rama (Assignment Gunet #10, 2026-10-14)** — keputusan build yang mengunci scope teknis:
    - **Tanpa alur cetak/print barcode** — barcode hanya di-generate & ditampilkan di UI.
    - **Scan barcode HANYA via kamera laptop** — pendekatan USB keyboard-wedge dihapus.
-   - **Backup lokal otomatis saat aplikasi ditutup**, retensi 7 hari, tanpa flashdisk/cloud.
-   - **Target OS: Windows 10/11 64-bit.**
+   - **Backup MANUAL via tombol "Unduh Backup"** (file `.db`) — revisi pivot #18: mekanisme lama "otomatis saat aplikasi ditutup" DIBATALKAN karena browser memblokir download saat tab ditutup; tanpa flashdisk/cloud.
+   - **Target: Windows 10/11 64-bit + browser modern (Chrome/Edge)** — tanpa `.exe`/installer.
    - **Asumsi volume: < 10.000 SKU.**
    - **Struktur build tetap sederhana.**
+   - **PIVOT WEB (Assignment #18):** Tauri/desktop DIBATALKAN — tanpa Rust; web murni diserve XAMPP.
 
-> **Catatan:** rekomendasi final Sentot sudah selesai (tech-stack.md, Meeting #2): **Tauri 2 + TypeScript + React (Vite) + SQLite**. Semua penanda tertunda di bawah sudah diselesaikan.
+> **Catatan:** rekomendasi final Sentot sudah selesai (tech-stack.md, Meeting #2): **Tauri 2 + TypeScript + React (Vite) + SQLite** — kemudian **direvisi via PIVOT WEB (assignment #18, keputusan Rama): Tauri DIBATALKAN**, diganti web murni (TypeScript + React + SQLite-WASM + OPFS, diserve XAMPP). Semua penanda tertunda di bawah sudah diselesaikan.
 
 ---
 
@@ -44,15 +48,16 @@ Pendekatan ini dibangun di atas keputusan yang sudah dikunci, BUKAN asumsi:
 ```
 ventra/
 ├── src/
-│   ├── main/                        # Entry point aplikasi desktop (Tauri 2)
-│   │   └── bootstrap.js             # Inisialisasi: buka DB, jalankan migrasi, buka jendela
+│   ├── main.tsx                     # Entry point aplikasi web (React)
 │   │
-│   ├── core/                        # Pondasi — dipakai semua domain, tidak boleh import dari domain/
-│   │   ├── database.js              # Koneksi database lokal + setup awal
-│   │   ├── migrasi.js               # Daftar perubahan skema DB per versi (v0.1, v0.2, ...)
-│   │   ├── transaksi-db.js          # Helper "jalankan beberapa query sebagai satu paket atomik"
-│   │   ├── kesalahan.js             # Tipe error aplikasi (mis. StokTidakCukup, DataTidakValid)
-│   │   └── konstanta.js             # Nilai tetap: satuan "pcs", nama aplikasi, versi
+│   ├── lib/                         # Pondasi — dipakai semua domain
+│   │   ├── db.ts                    # SATU-SATUNYA tempat query SQLite
+│   │   │                            #   (via @sqlite.org/sqlite-wasm + OPFS, VFS opfs-sahpool)
+│   │   ├── backup.ts                # Tombol "Unduh Backup" → file .db ke folder Download
+│   │   │                            #   (pengganti backup otomatis saat aplikasi ditutup —
+│   │   │                            #   tidak mungkin di browser; keputusan pivot #18)
+│   │   ├── kesalahan.ts             # Tipe error aplikasi (mis. StokTidakCukup, DataTidakValid)
+│   │   └── konstanta.ts             # Nilai tetap: satuan "pcs", nama aplikasi, versi
 │   │
 │   ├── domain/                      # ← Inti aplikasi: satu folder per domain bisnis
 │   │   │
@@ -97,21 +102,23 @@ ventra/
 │   │   ├── layar-laporan/           # Riwayat, laporan, tombol export Excel/PDF
 │   │   └── komponen/                # Komponen dipakai ulang: tabel, tombol, dialog, badge stok
 │   │
-│   └── infrastruktur/               # Hal non-bisnis
-│       ├── backup.js                # Backup otomatis file database SETIAP aplikasi ditutup;
-│       │                                #   retensi 7 hari (7 file terbaru), penyimpanan lokal saja
-│       │                                #   (tanpa flashdisk/cloud — keputusan final Rama). [SEJALAN DENGAN EPTHAL]
-│       └── pengaturan-aplikasi.js   # Baca/tulis tabel pengaturan (nama toko, dsb.)
+│   └── infrastruktur/               # (Dihapus di implementasi — digabung ke lib/)
 │
-├── migrasi/                         # File SQL per versi: 001_awal.sql, 002_tambah_audit.sql, ...
-├── tests/                           # Test per domain, mirror struktur src/domain/
-│   ├── transaksi/service-transaksi.test.js
-│   └── barang/service-barang.test.js
+├── migrasi/                         # File SQL per versi: 001_awal.sql, 002_audit_keamanan.sql, ...
+├── tests/                           # Test per domain, mirror struktur src/features/
+│   ├── transaksi/service-transaksi.test.ts
+│   └── barang/service-barang.test.ts
 ├── docs/
 │   ├── PROGRESS.md                   # Dokumentasi progress (lihat bagian 7)
 │   └── KEPUTUSAN.md                  # Log keputusan terkunci (rujukan ke Kurniatot)
-└── package.json / tauri.conf.json (Tauri 2 + React + plugin-sql)
+└── package.json (React + Vite + @sqlite.org/sqlite-wasm — TANPA Tauri/Rust sejak pivot #18)
 ```
+
+> **Catatan implementasi (build #17 + pivot #18):** struktur aktual memakai
+> `src/features/<domain>/{repo,service}-*.ts`, `src/pages/*.tsx`, `src/lib/`,
+> `src/components/`, `src/types/` — pemetaan 1:1 dari `domain/`, `ui/`, `core/`
+> pada pohon rencana di atas. Aturan import di bawah tetap berlaku dengan
+> pemetaan: `ui/*` → `pages/*` + `components/*`; `core/*` → `lib/*`.
 
 ### Aturan import (agar tidak kusut di kemudian hari)
 
@@ -157,13 +164,13 @@ Definisi versi mengacu pada Kurniatot (spesifikasi MVP final, sedang dikerjakan)
 
 | # | Pekerjaan | Kriteria selesai | Ketergantungan |
 |---|---|---|---|
-| 1 | Setup proyek + entry point desktop | Aplikasi terbuka sebagai jendela desktop | Tauri 2 + React (Vite); target OS terkunci: Windows 10/11 64-bit |
-| 2 | `core/database.js` + migrasi awal | Database file lokal terbentuk otomatis saat pertama dibuka | Model data Broto |
+| 1 | Setup proyek + entry point web | Aplikasi terbuka di browser via `npm run dev` | React + Vite; target: browser modern (Chrome/Edge) di Windows 10/11 64-bit |
+| 2 | `lib/db.ts` + migrasi awal | Database OPFS terbentuk otomatis saat pertama dibuka | Model data Broto; `@sqlite.org/sqlite-wasm` (VFS opfs-sahpool) |
 | 3 | Domain `pengguna`: login satu akun | Bisa login dengan password; password tersimpan sebagai hash, bukan teks biasa | Skema hash Cipher |
 | 4 | Domain `barang`: CRUD master barang | Tambah/ubah/hapus barang; kode/SKU unik divalidasi; harga beli & jual manual | Model data Broto |
 | 5 | Layar login + layar daftar barang | Dua layar bisa dibuka dan berfungsi | Mockup Prapto (referensi visual) |
 
-**Definisi selesai v0.1:** Rama bisa install, login, dan mengelola daftar barang. Belum ada transaksi stok.
+**Definisi selesai v0.1:** Rama bisa buka `http://localhost/ventra`, login, dan mengelola daftar barang. Belum ada transaksi stok.
 
 ### v0.2 — Transaksi stok inti
 
@@ -192,11 +199,11 @@ Definisi versi mengacu pada Kurniatot (spesifikasi MVP final, sedang dikerjakan)
 | # | Pekerjaan | Kriteria selesai | Ketergantungan |
 |---|---|---|---|
 | 1 | Reset password tanpa password lama | Username → cek keberadaan akun → jika ada, field reset unrestricted (langsung set password baru). Event reset dicatat di audit log | **FINAL 14 Okt 2026** (Cipher — lihat stock-barang-mvp-v1.md §8) |
-| 2 | Backup otomatis database lokal | Backup berjalan otomatis SETIAP aplikasi ditutup; 7 file backup terbaru disimpan (retensi 7 hari); penyimpanan lokal saja, tanpa flashdisk/cloud; restore teruji | **Epthal** (implementasi + runbook restore) |
-| 3 | Packaging → installer Windows | Installer 64-bit untuk Windows 10/11 yang bisa diklik dua kali di laptop Rama | `Ventra-setup.exe` (NSIS, Windows 64-bit) |
+| 2 | Backup manual database lokal | Tombol "Unduh Backup" mengunduh file `.db`; tanpa flashdisk/cloud; restore teruji | **Gunet** (implementasi) + **Epthal** (runbook restore) |
+| 3 | Deploy → XAMPP | `npm run build` → salin `dist/` ke `C:\xampp\htdocs\ventra` → Start Apache → `http://localhost/ventra` jalan di laptop Rama | Tanpa `.exe`/installer (pivot #18) |
 | 4 | Runbook operasional | Dokumen: cara install, backup/restore, apa yang dilakukan saat data bermasalah | **Epthal** |
 
-**Definisi selesai v0.4 = v1.0 (siap produksi):** Rama install sekali, pakai harian offline, data aman dengan backup.
+**Definisi selesai v0.4 = v1.0 (siap produksi):** deploy sekali ke XAMPP, Rama pakai harian offline via browser, data aman dengan backup manual rutin.
 
 ### Setelah v1.0 (backlog, bukan janji)
 
@@ -234,8 +241,9 @@ Prinsip: **progres dinilai dari hasil yang terverifikasi** (bisa didemokan/dites
 
 | Risiko | Dampak | Mitigasi |
 |---|---|---|
-| Tech stack belum konvergen (Sentot) | Struktur `src/main` & packaging tertunda | Struktur `domain/` & `core/` dikerjakan dulu — tidak bergantung stack |
-| Database file korup/rusak | Data hilang | Backup otomatis setiap aplikasi ditutup + retensi 7 hari (lokal, tanpa flashdisk/cloud); tulis database selalu lewat transaksi atomik |
+| Tech stack belum konvergen (Sentot) | Struktur deploy & packaging tertunda | Struktur `features/` & `lib/` dikerjakan dulu — tidak bergantung stack |
+| Database (OPFS) korup/rusak | Data hilang | Backup manual rutin via tombol "Unduh Backup" (biasakan tiap akhir hari kerja); tulis database selalu lewat transaksi atomik |
+| Dua tab Ventra terbuka bersamaan | Tab kedua gagal buka database (satu file = satu koneksi) | Pesan galat jelas di UI; SOP: pakai satu tab saja |
 | Kamera laptop tidak tersedia/rusak | Scan barcode tidak jalan | Scan HANYA via kamera laptop (keputusan final Rama — USB keyboard-wedge dihapus); input kode barang manual selalu tersedia sebagai cadangan di form transaksi |
 | Volume SKU melampaui 10.000 | Query melambat, file DB membengkak | Asumsi terkunci < 10.000 SKU (keputusan final Rama); test beban ringan di v0.2 dengan 10.000 data dummy; evaluasi ulang index/skema bila asumsi berubah |
 | Scope merayap (tambah fitur di tengah jalan) | v1.0 tidak selesai | Fitur baru masuk backlog pasca-v1.0; yang dikunci 18 jawaban Rama tidak diubah tanpa persetujuan Rama |
@@ -246,12 +254,13 @@ Prinsip: **progres dinilai dari hasil yang terverifikasi** (bisa didemokan/dites
 
 **Terkunci (keputusan final Rama, Assignment Gunet #10, 2026-10-14):**
 
-1. **Target OS: Windows 10/11 64-bit** — tidak lagi pertanyaan terbuka; installer 64-bit.
+1. **Target OS: Windows 10/11 64-bit + browser modern (Chrome/Edge)** — tidak lagi pertanyaan terbuka; tanpa `.exe`/installer (pivot #18: web via XAMPP).
 2. **Tanpa alur cetak/print barcode** — barcode di-generate & ditampilkan di UI saja. Pertanyaan "printer label tersedia atau tidak" dihapus.
 3. **Scan barcode HANYA via kamera laptop** — USB keyboard-wedge dihapus dari rencana.
-4. **Backup lokal otomatis saat aplikasi ditutup, retensi 7 hari** — tanpa flashdisk/cloud. Detail implementasi & runbook restore tetap dikerjakan Epthal.
-5. **Asumsi volume < 10.000 SKU** — database file lokal tunggal cukup; tidak perlu server.
+4. **Backup MANUAL via tombol "Unduh Backup" (file `.db`)** — tanpa flashdisk/cloud. Mekanisme lama "otomatis saat aplikasi ditutup" DIBATALKAN (pivot #18 — browser memblokir download saat tab ditutup). Detail runbook restore tetap dikerjakan Epthal.
+5. **Asumsi volume < 10.000 SKU** — database OPFS tunggal cukup; tidak perlu server.
 6. **Struktur build tetap sederhana** — tidak ada modul/fitur di luar yang terkunci di dokumen ini tanpa persetujuan Rama.
+7. **PIVOT WEB (Assignment #18):** Tauri/desktop DIBATALKAN — tanpa Rust, tanpa `.exe`; web murni diserve XAMPP (`http://localhost/ventra`); SQLite via WASM + OPFS (VFS opfs-sahpool).
 
 **Masih terbuka:**
 

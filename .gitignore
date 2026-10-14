@@ -6,14 +6,6 @@ yarn-error.log*
 dist/
 dist-ssr/
 
-# Tauri / Rust
-src-tauri/target/
-src-tauri/WixTools/
-*.AppImage
-*.dmg
-*.exe
-*.msi
-
 # SQLite & data lokal
 *.db
 *.db-shm

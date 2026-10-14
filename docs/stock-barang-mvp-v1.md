@@ -1,7 +1,8 @@
 # VENTRA — Spesifikasi MVP v1 (FINAL/BEKU)
 
-**Aplikasi stock barang sederhana — offline, desktop, lokal di laptop Rama.**
+**Aplikasi stock barang sederhana — offline, web, lokal di laptop Rama.**
 Disusun: 14 Okt 2026 oleh tim Virtual Office (Manager: Muse). Diperbarui: 14 Okt 2026 — 3 keputusan final Rama (Template B dipilih; mekanisme lupa-password final; format kode barang per kategori) — baris 25–27 baru; §6, §8, §11 disesuaikan.
+**Revisi pivot (14 Okt 2026, keputusan Rama):** Tauri/desktop DIBATALKAN — aplikasi menjadi **WEB MURNI** (tanpa Rust, tanpa `.exe`; diserve XAMPP di `http://localhost/ventra`); database SQLite via WASM + OPFS; backup "otomatis saat aplikasi ditutup" diganti tombol **"Unduh Backup"** manual. §1, §4, §10, §11 dan baris 19/21 disesuaikan.
 Sumber: hasil Meeting #1 + 18 jawaban final Rama + 6 jawaban tambahan Rama (14 Okt 2026) — jawaban Rama mengesampingkan semua asumsi lama.
 Status: **BEKU** — jangan mulai coding di luar daftar ini tanpa persetujuan Rama.
 
@@ -9,9 +10,9 @@ Status: **BEKU** — jangan mulai coding di luar daftar ini tanpa persetujuan Ra
 
 ## 1. Ringkasan
 
-Ventra adalah aplikasi desktop Windows yang 100% offline untuk mencatat stok barang: master barang → catat stok masuk → catat stok keluar → lihat sisa stok → riwayat/laporan. Satu akun, satu lokasi, satuan pcs, database lokal SQLite, tanpa server/cloud/internet.
+Ventra adalah aplikasi web yang 100% offline untuk mencatat stok barang: master barang → catat stok masuk → catat stok keluar → lihat sisa stok → riwayat/laporan. Satu akun, satu lokasi, satuan pcs, database lokal SQLite (via WebAssembly + OPFS di browser), tanpa server/cloud/internet. Dijalankan via XAMPP di `http://localhost/ventra`.
 
-**Rekomendasi teknologi (konvergensi Sentot–Gunet–Epthal–Magna): Tauri 2 + TypeScript + React (Vite) + SQLite.** Installer ±15 MB, nol biaya infra. Detail lengkap: `tech-stack.md`.
+**Rekomendasi teknologi (konvergensi Sentot–Gunet–Epthal–Magna + pivot web 14 Okt 2026): TypeScript + React (Vite) + SQLite-WASM.** Tanpa install, nol biaya infra. Detail lengkap: `tech-stack.md`.
 
 **Referensi desain (TERKUNCI):** Template B — mockup `specs/mockups/template-b.html` menjadi acuan visual build (dipilih Rama 14 Okt 2026).
 
@@ -39,9 +40,9 @@ Ventra adalah aplikasi desktop Windows yang 100% offline untuk mencatat stok bar
 | 16 | Data sensitif | Tidak ada; adakan reset & forgot password TANPA meminta password lama | Mekanisme reset FINAL: username → cek akun → jika ada, field reset menjadi unrestricted (langsung set password baru tanpa password lama) — MENGGANTIKAN opsi A/B (lihat §8) |
 | 17 | Internal/integrasi | Internal, tanpa integrasi | Tanpa API/integrasi pihak ketiga |
 | 18 | Tenggat | Secepatnya; "sederhana banget" | Scope minimal; tanpa fitur di luar daftar ini |
-| 19 | OS target | Windows 10/11 64-bit | Installer `.exe` 64-bit; OS terkunci — tanpa dukungan OS lain di MVP |
+| 19 | OS target | Windows 10/11 64-bit + browser modern (Chrome/Edge) | Tanpa `.exe`/installer — aplikasi web via XAMPP `http://localhost/ventra`; OS terkunci — tanpa dukungan OS lain di MVP |
 | 20 | Printer | Tidak ada; barcode display-only di UI | Tanpa alur cetak label; barcode dirender di UI saja |
-| 21 | Backup | Otomatis lokal saja, tanpa eksternal | Backup otomatis ke folder Backup lokal (retensi 7 hari); tanpa cloud/eksternal/flashdisk di MVP |
+| 21 | Backup | Manual via tombol "Unduh Backup" (file `.db` ke folder Download) | Backup otomatis saat aplikasi ditutup DIBATALKAN (browser memblokir download saat tab ditutup); tanpa cloud/eksternal otomatis di MVP |
 | 22 | USB scanner | Tidak ada & tidak perlu dibeli | Scan hanya via kamera laptop; tanpa keyboard-wedge |
 | 23 | Multi-user/cabang | Dibutuhkan di masa depan; MVP tetap 1 akun tanpa peran | Catat implikasi arsitektur (lihat tech-stack.md); tanpa over-engineering sekarang |
 | 24 | Volume data | Di bawah 10.000 SKU | Asumsi volume; SQLite sangat longgar |
@@ -62,7 +63,7 @@ Ventra adalah aplikasi desktop Windows yang 100% offline untuk mencatat stok bar
 - **F7. Login satu akun** — Username + password (di-hash). Link "Lupa password?" → reset tanpa password lama (mekanisme §8).
 - **F8. Laporan** — Stok akhir, rekap mutasi per periode, kartu stok per barang; export **Excel (.xlsx)** & **PDF** (isi §7).
 - **F9. Stok opname** — Penyesuaian hasil hitung fisik tercatat sebagai transaksi penyesuaian beralasan, bukan edit diam-diam.
-- **F10. Fondasi non-fungsional** — Validasi bisnis di lapisan aplikasi + constraint database (`CHECK(stok >= 0)`, transaksi atomik), password di-hash, audit trail utuh, backup otomatis + uji restore sebelum go-live, struktur kode modular per domain, dokumentasi skema data.
+- **F10. Fondasi non-fungsional** — Validasi bisnis di lapisan aplikasi + constraint database (`CHECK(stok >= 0)`, transaksi atomik), password di-hash, audit trail utuh, backup manual (tombol "Unduh Backup") + uji restore sebelum go-live, struktur kode modular per domain, dokumentasi skema data.
 
 **Target versi:** v0.1 = F1–F3 + F7 (bisa dipakai internal) → v1.0 = F1–F9 + kriteria: 100 barang & 1.000 transaksi tanpa error, audit trail utuh, backup/restore teruji.
 
@@ -70,15 +71,15 @@ Ventra adalah aplikasi desktop Windows yang 100% offline untuk mencatat stok bar
 
 ## 4. Rekomendasi teknologi (satu rekomendasi, sudah konvergen)
 
-**Headline: Tauri 2 + TypeScript + React (Vite) + SQLite** — aplikasi desktop Windows "Ventra", 100% offline, installer ±15 MB, nol infra.
+**Headline: TypeScript + React (Vite) + SQLite via WebAssembly** — aplikasi web "Ventra", 100% offline, tanpa install, nol infra. **(Pivot 14 Okt 2026: Tauri/desktop dibatalkan atas keputusan Rama — tanpa Rust, tanpa `.exe`.)**
 
-- **Framework:** TypeScript + React (Vite) untuk UI; Rust via Tauri hanya sebagai jembatan (Gunet kemungkinan tidak perlu menulis Rust — akses DB via `tauri-plugin-sql`).
-- **Database:** SQLite, satu file `stok.db` — tanpa server, tanpa konfigurasi. Aturan anti-stok-negatif ditegakkan di DB (`CHECK(stok >= 0)` + transaksi atomik), mode WAL anti-corrupt.
-- **Desktop:** Tauri 2 (jendela native + webview sistem). Tradeoff jujur: butuh WebView2 (umumnya sudah ada di Win 10/11); toolchain Rust hanya di laptop dev. Ditolak: Electron (150 MB+, rakus RAM), web server lokal + browser (bukan aplikasi beneran).
-- **Barcode generate:** jsbarcode (Code128, pure-JS, tampil di UI saja — tanpa cetak). **Scan:** kamera laptop via @zxing/browser (offline); tanpa USB scanner di MVP.
-- **Export Excel:** SheetJS (`xlsx` Community). **Export PDF:** pdfmake. Keduanya pure-JS, offline penuh.
-- **Instalasi:** `Ventra-setup.exe` → Next → Finish → buat akun → pakai. Data di folder data aplikasi lokal.
-- **Backup:** otomatis tiap aplikasi ditutup ke folder Backup lokal (rotasi 7 hari, tanpa eksternal) + tombol "Backup sekarang".
+- **Framework:** TypeScript + React (Vite) untuk UI; database SQLite berjalan sebagai WASM di browser (`@sqlite.org/sqlite-wasm`), persisten di OPFS.
+- **Database:** SQLite, satu database `stok.db` di OPFS browser — tanpa server, tanpa konfigurasi. Aturan anti-stok-negatif ditegakkan di DB (`CHECK(stok >= 0)` + transaksi atomik).
+- **Web:** hasil `npm run build` = file statis di `dist/`, disalin ke `C:\xampp\htdocs\ventra`, diserve Apache → `http://localhost/ventra`. Tradeoff jujur: butuh XAMPP jalan; tidak bisa dobel-klik `index.html` (`file://` diblokir untuk modul ES/WASM); jangan buka di dua tab bersamaan (satu database = satu koneksi).
+- **Barcode generate:** jsbarcode (Code128, pure-JS, tampil di UI saja — tanpa cetak). **Scan:** kamera laptop via @zxing/browser (offline, jalan native di browser); tanpa USB scanner di MVP.
+- **Export Excel:** SheetJS (`xlsx` Community). **Export PDF:** jsPDF + autotable (bagian ini menggantikan penyebutan pdfmake sebelumnya — yang dipakai di kode adalah jsPDF). Keduanya pure-JS, offline penuh.
+- **Instalasi:** tidak ada installer — salin `dist/` → `C:\xampp\htdocs\ventra` → Start Apache → buka `http://localhost/ventra` → buat akun → pakai. Data di OPFS browser (origin `http://localhost`).
+- **Backup:** tombol **"Unduh Backup"** (toolbar Daftar Barang) → file `ventra-backup-YYYYMMDD-HHMMSS.db` ke folder Download. Backup otomatis saat aplikasi ditutup **tidak mungkin di browser** (download saat tab ditutup diblokir) — diganti manual.
 - **Modul:** auth, dashboard, barang, barcode, transaksi, laporan, pengaturan & backup.
 - Detail lengkap: `tech-stack.md`. Model data lengkap: `model-data.md`. Pendekatan build: `pendekatan-teknis-gunet.md`.
 
@@ -151,16 +152,16 @@ Catatan: export Excel/PDF adalah unduhan file, bukan cetak ke printer — konsis
 - F7: kredensial salah → ditolak; tanpa login → dialihkan; reset password mengikuti §8.
 - F8: angka laporan = data aplikasi; periode kosong → laporan kosong yang jelas.
 - F9: alasan kosong → ditolak; stok berubah sesuai selisih.
-- F10: 100 barang & 1.000 transaksi tanpa error; backup terbentuk & restore teruji sebelum go-live.
+- F10: 100 barang & 1.000 transaksi tanpa error; backup terunduh & restore teruji sebelum go-live.
 
 ---
 
 ## 10. Backup & runbook (Epthal)
 
-- **Backup otomatis:** tiap aplikasi ditutup (min. 1×/hari), salin `stok.db` ke folder Backup dengan nama bertanggal; retensi 7 hari. **Hanya lokal — tanpa backup eksternal/cloud/flashdisk di MVP.** Tombol "Backup sekarang" (mis. sebelum opname) — tetap ke folder Backup lokal.
-- **Restore:** Pengaturan → Pulihkan Backup → pilih file → konfirmasi. Manual: timpa file db saat aplikasi tertutup.
-- **Instalasi:** `Ventra-setup.exe` → Next → Finish → buat akun → pakai. Tanpa internet.
-- **Runbook:** aplikasi tidak bisa dibuka → instal ulang (data terpisah, aman). Data hilang/rusak → restore backup terbaru → cek dashboard. Backup bermasalah → pakai backup sehari sebelumnya; catat transaksi yang hilang untuk input ulang. **Wajib uji restore 1× sebelum go-live.**
+- **Backup manual:** tombol **"Unduh Backup"** (toolbar layar Daftar Barang) → file `ventra-backup-YYYYMMDD-HHMMSS.db` terunduh ke folder Download; pindahkan ke flashdisk/tempat aman. **Hanya lokal — tanpa backup eksternal/cloud otomatis di MVP.** Backup otomatis saat aplikasi ditutup **DIBATALKAN** (pivot web 14 Okt 2026): browser memblokir download yang dipicu saat tab ditutup — batasan teknis, bukan pilihan desain. Biasakan backup tiap akhir hari kerja.
+- **Restore:** direncanakan (impor file `.db` kembali ke OPFS) — belum ada di v0.1. **Wajib uji restore 1× sebelum go-live** (usulan Epthal).
+- **Instalasi:** salin `dist/` → `C:\xampp\htdocs\ventra` → Start Apache → buka `http://localhost/ventra` → buat akun → pakai. Tanpa internet.
+- **Runbook:** aplikasi tidak bisa dibuka → cek Apache jalan → reload `http://localhost/ventra`. Data hilang/rusak → (setelah fitur restore ada) restore backup terbaru → cek dashboard. Backup bermasalah → pakai backup sehari sebelumnya; catat transaksi yang hilang untuk input ulang. Jangan buka Ventra di dua tab bersamaan.
 
 ---
 
@@ -170,7 +171,7 @@ Catatan: export Excel/PDF adalah unduhan file, bukan cetak ke printer — konsis
 2. **Mekanisme lupa password** — **TERKUNCI (14 Okt 2026):** username → cek keberadaan akun → jika ada, field reset unrestricted (langsung set password baru tanpa password lama). Opsi A (kode pemulihan) dan B (pertanyaan keamanan) DIBATALKAN. Lihat §8 dan baris 26.
 3. **Format kode/barcode** — **TERKUNCI (14 Okt 2026):** pola kode dikonfigurasi sendiri user PER KATEGORI; setiap barang baru auto-generate kode sekuensial (cth. `BRG-0000001`); kategori = entitas CRUD. Lihat §6 dan baris 27.
 4. **Definisi nilai stok — TERKUNCI (14 Okt 2026):** nilai stok = stok × **harga beli** (keputusan final Rama).
-5. **Jadwal backup otomatis — TERKUNCI (14 Okt 2026):** backup otomatis saat aplikasi **ditutup** (keputusan Rama; retensi 7 hari, lokal saja). §4 sudah diselaraskan dengan §10.
+5. **Jadwal backup — TERKUNCI (pivot web 14 Okt 2026):** backup **manual via tombol "Unduh Backup"** (file `.db`, keputusan Rama). Mekanisme lama "otomatis saat aplikasi ditutup" **DIBATALKAN** — browser memblokir download saat tab ditutup. §4 dan §10 sudah diselaraskan.
 
 ---
 
